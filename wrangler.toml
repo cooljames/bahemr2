@@ -1,0 +1,14 @@
+name = "bahemr2"
+main = "src/index.js"
+compatibility_date = "2026-04-09"
+
+assets = { directory = "./public" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bahemr2-db"
+database_id = "d16dd094-1a74-4c28-9ea9-7e9f2f440e7b"
+
+# JWT_SECRET은 Cloudflare Workers 대시보드에서 Secret으로 설정하세요.
+# 절대 여기에 실제 값을 적지 마세요!
+

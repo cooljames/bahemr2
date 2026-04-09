@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bahEMR — 회원가입</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+  <div class="auth-bg"><div class="grid-pattern"></div></div>
+
+  <main class="auth-container">
+    <div class="auth-card auth-card-wide">
+      <div class="auth-logo">
+        <span class="logo-cross">⚕</span>
+        <h1>bah<strong>EMR</strong></h1>
+        <p class="auth-subtitle">신규 계정 등록</p>
+      </div>
+
+      <form class="auth-form" id="signupForm">
+        <div class="form-row">
+          <div class="form-field">
+            <label for="name">이름 (실명) <span class="req">*</span></label>
+            <input type="text" id="name" placeholder="홍길동" required maxlength="50" />
+          </div>
+          <div class="form-field">
+            <label for="email">이메일 <span class="req">*</span></label>
+            <input type="email" id="email" placeholder="example@company.com" required />
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="company">소속 관계사</label>
+          <select id="company">
+            <option value="">-- 소속 관계사 선택 (없으면 미선택) --</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="password">비밀번호 <span class="req">*</span></label>
+            <input type="password" id="password" placeholder="8자 이상" required minlength="8" />
+          </div>
+          <div class="form-field">
+            <label for="password2">비밀번호 확인 <span class="req">*</span></label>
+            <input type="password" id="password2" placeholder="비밀번호 재입력" required />
+          </div>
+        </div>
+
+        <div class="info-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          가입 후 관리자 승인(역할 부여) 전까지 일부 기능이 제한됩니다.
+        </div>
+
+        <div class="form-error" id="signupError"></div>
+        <div class="form-success" id="signupSuccess" style="display:none"></div>
+
+        <button type="submit" class="btn-primary" id="signupBtn">
+          <span class="btn-text">계정 생성</span>
+          <span class="btn-spinner" style="display:none"><svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <span>이미 계정이 있으신가요?</span>
+        <a href="/index.html">로그인</a>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/signup.js"></script>
+</body>
+</html>

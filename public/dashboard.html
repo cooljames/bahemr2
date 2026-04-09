@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bahEMR — 대시보드</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     사이드바
+═══════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-header">
+    <a href="/dashboard.html" class="sb-logo" id="homeLogoLink">
+      <span class="sb-logo-icon">⚕</span>
+      <span class="sb-logo-text">bah<strong>EMR</strong></span>
+    </a>
+    <button class="sb-close" id="sbClose">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <nav class="sb-nav">
+    <!-- 홈 -->
+    <div class="sb-section">
+      <a href="/dashboard.html" class="sb-item sb-item--home" id="navHome" data-view="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        <span>대시보드 홈</span>
+      </a>
+    </div>
+
+    <!-- 게시판 목록 -->
+    <div class="sb-section">
+      <span class="sb-label">게시판</span>
+      <div id="sbBoardList">
+        <div class="sb-skeleton"></div>
+        <div class="sb-skeleton"></div>
+        <div class="sb-skeleton"></div>
+      </div>
+      <!-- 슈퍼관리자 전용 -->
+      <button class="sb-item sb-item--add" id="sbCreateBoard" style="display:none" onclick="App.openCreateBoardModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>게시판 생성</span>
+      </button>
+    </div>
+
+    <!-- 관리 메뉴 (admin 이상) -->
+    <div class="sb-section" id="sbAdminSection" style="display:none">
+      <span class="sb-label">관리</span>
+      <a href="#" class="sb-item" data-view="users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>사용자 관리</span>
+      </a>
+      <a href="#" class="sb-item" data-view="companies" id="sbCompanies">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>관계사 관리</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- 사용자 정보 -->
+  <div class="sb-user" id="sbUser">
+    <div class="sb-user-avatar" id="sbAvatar">?</div>
+    <div class="sb-user-info">
+      <span class="sb-user-name" id="sbName">-</span>
+      <span class="sb-user-role" id="sbRole">-</span>
+    </div>
+    <button class="sb-logout" id="sbLogout" title="로그아웃">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
+  </div>
+</aside>
+
+<!-- 모바일 오버레이 -->
+<div class="sb-overlay" id="sbOverlay"></div>
+
+<!-- ═══════════════════════════════════════════════
+     메인
+═══════════════════════════════════════════════ -->
+<div class="main-wrap">
+  <!-- 상단 헤더 -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <button class="hamburger" id="hamburger">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="breadcrumb" id="breadcrumb">
+        <a href="/dashboard.html">홈</a>
+      </nav>
+    </div>
+    <div class="top-bar-right">
+      <span class="company-badge" id="companyBadge" style="display:none"></span>
+    </div>
+  </header>
+
+  <!-- 콘텐츠 -->
+  <div class="content-area" id="contentArea">
+
+    <!-- ── 대시보드 홈 ── -->
+    <div class="view" id="view-home">
+      <div class="page-header">
+        <div>
+          <h1>대시보드</h1>
+          <p id="welcomeMsg">환영합니다.</p>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card" id="statCard1" style="display:none">
+          <div class="stat-icon si-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">전체 사용자</span>
+            <span class="stat-val" id="statUsers">-</span>
+          </div>
+        </div>
+        <div class="stat-card" id="statCard2" style="display:none">
+          <div class="stat-icon si-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">게시판 수</span>
+            <span class="stat-val" id="statBoards">-</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">전체 게시글</span>
+            <span class="stat-val" id="statPosts">-</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-orange">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">접수 대기</span>
+            <span class="stat-val" id="statPending">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 접수 상태 현황 -->
+      <div class="status-panel" id="statusPanel" style="display:none">
+        <h3>접수 현황</h3>
+        <div class="status-bars" id="statusBars"></div>
+      </div>
+
+      <!-- 최근 게시글 -->
+      <div class="recent-panel">
+        <div class="panel-header">
+          <h3>최근 게시글</h3>
+        </div>
+        <div id="recentList" class="recent-list">
+          <div class="loading-row">불러오는 중...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 게시판 목록 뷰 ── -->
+    <div class="view" id="view-board" style="display:none">
+      <div class="page-header">
+        <div>
+          <h1 id="boardTitle">게시판</h1>
+          <p id="boardDesc"></p>
+        </div>
+        <div class="page-actions">
+          <button class="btn-secondary" id="btnExport" style="display:none" onclick="App.exportCSV()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            CSV 내보내기
+          </button>
+          <button class="btn-primary" id="btnWrite" onclick="App.openWriteView()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            글쓰기
+          </button>
+        </div>
+      </div>
+
+      <!-- 검색/필터 -->
+      <div class="filter-bar">
+        <input type="text" id="searchInput" placeholder="제목 또는 내용 검색..." class="search-input" />
+        <select id="statusFilter" class="filter-select" style="display:none">
+          <option value="">전체 상태</option>
+          <option value="submitted">제출</option>
+          <option value="reviewing">검토중</option>
+          <option value="accepted">접수완료</option>
+          <option value="rejected">반려</option>
+        </select>
+        <button class="btn-ghost" onclick="App.loadPosts()">검색</button>
+      </div>
+
+      <!-- 게시글 목록 테이블 -->
+      <div class="table-wrap">
+        <table class="post-table">
+          <thead>
+            <tr>
+              <th class="col-num">번호</th>
+              <th class="col-title">제목</th>
+              <th class="col-status" id="thStatus" style="display:none">상태</th>
+              <th class="col-author">작성자</th>
+              <th class="col-company" id="thCompany" style="display:none">관계사</th>
+              <th class="col-date">날짜</th>
+            </tr>
+          </thead>
+          <tbody id="postTableBody">
+            <tr><td colspan="6" class="empty-td">게시글을 불러오는 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 페이지네이션 -->
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- ── 게시글 상세 뷰 ── -->
+    <div class="view" id="view-post" style="display:none">
+      <div class="post-detail" id="postDetail"></div>
+    </div>
+
+    <!-- ── 글쓰기/수정 뷰 ── -->
+    <div class="view" id="view-write" style="display:none">
+      <div class="write-wrap" id="writeWrap"></div>
+    </div>
+
+    <!-- ── 사용자 관리 뷰 ── -->
+    <div class="view" id="view-users" style="display:none">
+      <div class="page-header">
+        <h1>사용자 관리</h1>
+      </div>
+      <div id="userManageContent"></div>
+    </div>
+
+    <!-- ── 관계사 관리 뷰 ── -->
+    <div class="view" id="view-companies" style="display:none">
+      <div class="page-header">
+        <div><h1>관계사 관리</h1></div>
+        <button class="btn-primary" id="btnAddCompany" onclick="App.openCompanyModal()">+ 관계사 추가</button>
+      </div>
+      <div id="companyListContent"></div>
+    </div>
+
+  </div><!-- /content-area -->
+</div><!-- /main-wrap -->
+
+<!-- ═══════════════════════════════════════════════
+     모달들
+═══════════════════════════════════════════════ -->
+
+<!-- 게시판 생성 모달 -->
+<div class="modal-backdrop" id="modalCreateBoard" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>게시판 생성</h2>
+      <button class="modal-x" onclick="App.closeCreateBoardModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="mf-group">
+        <label>게시판 이름 <span class="req">*</span></label>
+        <input type="text" id="mbName" placeholder="예: 공지사항, 접수게시판" maxlength="50" />
+      </div>
+      <div class="mf-group">
+        <label>설명</label>
+        <textarea id="mbDesc" rows="2" placeholder="게시판 용도 설명"></textarea>
+      </div>
+      <div class="mf-row">
+        <div class="mf-group">
+          <label>게시판 유형</label>
+          <select id="mbType">
+            <option value="general">일반</option>
+            <option value="notice">공지사항</option>
+            <option value="reception">접수게시판</option>
+          </select>
+        </div>
+        <div class="mf-group">
+          <label>정렬 순서</label>
+          <input type="number" id="mbOrder" value="0" min="0" />
+        </div>
+      </div>
+      <div class="mf-row">
+        <div class="mf-group">
+          <label>읽기 권한</label>
+          <select id="mbAccess">
+            <option value="all">전체 (모든 로그인 사용자)</option>
+            <option value="staff">내부 직원 이상</option>
+            <option value="admin">관리자 이상</option>
+          </select>
+        </div>
+        <div class="mf-group">
+          <label>쓰기 권한</label>
+          <select id="mbWrite">
+            <option value="all">전체</option>
+            <option value="staff">내부 직원 이상</option>
+            <option value="admin">관리자 이상</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="App.closeCreateBoardModal()">취소</button>
+      <button class="btn-primary" onclick="App.submitCreateBoard()">생성</button>
+    </div>
+  </div>
+</div>
+
+<!-- 관계사 모달 -->
+<div class="modal-backdrop" id="modalCompany" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="companyModalTitle">관계사 추가</h2>
+      <button class="modal-x" onclick="App.closeCompanyModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="mf-group">
+        <label>관계사명 <span class="req">*</span></label>
+        <input type="text" id="cmName" placeholder="관계사 이름" maxlength="100" />
+      </div>
+      <div class="mf-group">
+        <label>유형</label>
+        <select id="cmType">
+          <option value="nursing_home">요양원/복지관</option>
+          <option value="clinic">검진센터/클리닉</option>
+          <option value="insurance">보험사/행정기관</option>
+          <option value="corporate">기업 복지팀</option>
+          <option value="shipping">선사/해운사</option>
+          <option value="agency">해운 에이전트</option>
+          <option value="foreign">외국인 대상 기관</option>
+          <option value="other">기타</option>
+        </select>
+      </div>
+      <div class="mf-group">
+        <label>연락처</label>
+        <input type="text" id="cmContact" placeholder="전화번호 또는 이메일" />
+      </div>
+      <div class="mf-group">
+        <label>메모</label>
+        <textarea id="cmMemo" rows="2" placeholder="기타 메모"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="App.closeCompanyModal()">취소</button>
+      <button class="btn-primary" onclick="App.submitCompany()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 알림 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/dashboard.js"></script>
+</body>
+</html>
