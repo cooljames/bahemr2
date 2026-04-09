@@ -29,18 +29,17 @@ export async function verifyJWT(request, env) {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
-    const key  = await importKey(env.JWT_SECRET);
+    const secret = env.JWT_SECRET || 'my_temporary_secret_key_12345';
+    const key  = await importKey(secret);
     const sig  = b64urlDecode(parts[2]);
     const data = enc(`${parts[0]}.${parts[1]}`);
     const ok   = await crypto.subtle.verify('HMAC', key, sig, data);
     if (!ok) return null;
 
-    // 한글(Unicode) 깨짐 방지용 디코딩 처리
     const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(escape(atob(base64)));
     const payload = JSON.parse(jsonPayload);
-    
-    // 만료 확인
+
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch (e) {

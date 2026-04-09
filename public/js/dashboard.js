@@ -89,60 +89,14 @@ const App = (() => {
 
   // ── 초기화 ────────────────────────────────────────────────
   async function init() {
-
-  console.log('=== Dashboard Init Start ===');
-  
-  const token = localStorage.getItem('bahemr_token');
-  const userStr = localStorage.getItem('bahemr_user');
-  console.log('Token:', token ? token.substring(0, 50) + '...' : '없음');
-  console.log('User:', userStr ? JSON.parse(userStr) : '없음');
-
-  if (!token || !userStr) {
-    console.error('토큰 또는 유저 정보 없음 → 로그인 페이지로');
-    window.location.href = '/index.html';
-    return;
-  }
-
-  currentUser = JSON.parse(userStr);
-
-  // ==================== 디버그용 ====================
-  try {
-    console.log('1. 게시판 로드 시작...');
-    await loadBoards();
-    console.log('2. 게시판 로드 완료');
-
-    console.log('3. 홈 데이터 로드 시작...');
-    await loadHome();
-    console.log('4. 홈 데이터 로드 완료');
-
-    showView('home');
-    console.log('=== Dashboard Init 성공 ===');
-  } catch (err) {
-    console.error('🚨 대시보드 로드 중 치명적 에러:', err);
-    alert('로드 실패: ' + err.message);   // 팝업으로도 확인
-  }
-}
-    
-    
-  console.log('=== Dashboard Init Debug ===');
-  console.log('Token exists:', !!localStorage.getItem('bahemr_token'));
-  console.log('User exists:', !!localStorage.getItem('bahemr_user'));
-  
-  const token = API.getToken();
-  const user = API.getUser();
-  console.log('Parsed Token:', token ? token.substring(0, 30) + '...' : null);
-  console.log('Parsed User:', user);
-
-  if (!token || !user) {
-    console.error('Redirecting to login because token or user is missing');
-    window.location.href = '/index.html';
-    return;
-  }
-
-    const user = API.getUser();
-    if (!user) { window.location.href = '/index.html'; return; }
     const token = API.getToken();
-    if (!token) { window.location.href = '/index.html'; return; }
+    const user = API.getUser();
+
+    if (!token || !user) {
+      console.error('토큰 또는 유저 정보 없음 → 로그인 페이지로');
+      window.location.href = '/index.html';
+      return;
+    }
 
     currentUser = user;
 
@@ -159,7 +113,6 @@ const App = (() => {
       cb.style.display = '';
     }
 
-    // 관리 섹션 표시
     if (['superadmin','admin'].includes(user.role)) {
       document.getElementById('sbAdminSection').style.display = '';
     }
@@ -167,33 +120,35 @@ const App = (() => {
       document.getElementById('sbCreateBoard').style.display = '';
     }
 
-    // 이벤트 바인딩
     document.getElementById('sbLogout').addEventListener('click', logout);
     document.getElementById('navHome').addEventListener('click', (e) => { e.preventDefault(); goHome(); });
     document.getElementById('hamburger').addEventListener('click', openSidebar);
     document.getElementById('sbClose').addEventListener('click', closeSidebar);
     document.getElementById('sbOverlay').addEventListener('click', closeSidebar);
 
-    // 관리 메뉴 클릭
     document.querySelectorAll('[data-view]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.preventDefault();
         const view = el.dataset.view;
-        if (view === 'users')     loadUsersView();
+        if (view === 'users')          loadUsersView();
         else if (view === 'companies') loadCompaniesView();
-        else if (view === 'home') goHome();
+        else if (view === 'home')      goHome();
         closeSidebar();
       });
     });
 
-    // 검색 엔터
     document.getElementById('searchInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') loadPosts();
     });
 
-    await loadBoards();
-    await loadHome();
-    showView('home');
+    try {
+      await loadBoards();
+      await loadHome();
+      showView('home');
+    } catch (err) {
+      console.error('🚨 대시보드 로드 중 치명적 에러:', err);
+      alert('로드 실패: ' + (err.message || err));
+    }
   }
 
   // ── 사이드바 ──────────────────────────────────────────────
