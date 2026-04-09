@@ -35,16 +35,20 @@ export async function verifyJWT(request, env) {
     const ok   = await crypto.subtle.verify('HMAC', key, sig, data);
     if (!ok) return null;
 
-    const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
-    // 만료 확인 (7일)
+    // 한글(Unicode) 깨짐 방지용 디코딩 처리
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(escape(atob(base64)));
+    const payload = JSON.parse(jsonPayload);
+    
+    // 만료 확인
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
-  } catch {
+  } catch (e) {
     return null;
   }
 }
 
-// ── 비밀번호 해싱 (SHA-256 기반, 실무에서는 bcrypt 권장) ──────
+// ── 비밀번호 해싱 (SHA-256 기반) ──────────────────────────────
 export async function hashPassword(password) {
   const data   = enc(password + ':bahemr-salt');
   const buffer = await crypto.subtle.digest('SHA-256', data);
