@@ -32,9 +32,12 @@ export async function handleAuth(request, env, path) {
         return json({ error: '관리자 승인 대기 중입니다. 담당자에게 문의하세요.' }, 403);
       }
 
-      // 2. JWT 발급 에러 추적
+// 2. JWT 발급 에러 추적
       let token;
       try {
+        // env.JWT_SECRET이 비어있으면 뒤에 있는 임시 문자열을 사용하도록 '||' 추가
+        const secretKey = env.JWT_SECRET || 'my_temporary_secret_key_12345'; 
+        
         token = await signJWT({
           sub:        user.id,
           email:      user.email,
@@ -42,7 +45,7 @@ export async function handleAuth(request, env, path) {
           role:       user.role,
           company_id: user.company_id,
           exp:        Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7  // 7일
-        }, env.JWT_SECRET);
+        }, secretKey);
       } catch (jwtErr) {
         return json({ error: '토큰 발급 에러: ' + jwtErr.message }, 500);
       }
