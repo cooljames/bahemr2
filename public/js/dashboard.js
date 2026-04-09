@@ -519,7 +519,7 @@ const App = (() => {
           ${attachments.length === 0 ? '<div style="color:var(--muted);font-size:13px">첨부파일 없음</div>' :
             attachments.map(a => `
               <div class="attach-item" id="att-${a.id}">
-                <span class="attach-icon">${fileIcon(a.mime_type)}</span>
+                ${a.mime_type.startsWith('image/') ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" />` : `<span class="attach-icon">${fileIcon(a.mime_type)}</span>`}
                 <div class="attach-info">
                   <div class="attach-name">${esc(a.filename)}</div>
                   <div class="attach-size">${fileSize(a.file_size)}</div>
@@ -681,6 +681,19 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
+  function viewImage(attId, filename) {
+    const modal = document.createElement('div');
+    modal.className = 'image-modal';
+    modal.innerHTML = `
+      <div class="image-modal-overlay" onclick="this.parentElement.remove()"></div>
+      <div class="image-modal-content">
+        <img src="/api/attachments/${attId}" alt="${esc(filename)}" />
+        <button class="image-modal-close" onclick="this.parentElement.parentElement.remove()">✕</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
   async function deleteFile(attId) {
     if (!confirm('첨부파일을 삭제하시겠습니까?')) return;
     try {
@@ -750,6 +763,11 @@ const App = (() => {
           <label>${isReception ? '추가 내용 / 특이사항' : '내용 *'}</label>
           <textarea id="wContent" placeholder="내용을 입력하세요">${esc(p.content||'')}</textarea>
         </div>
+        <div class="form-group">
+          <label>첨부파일</label>
+          <input type="file" id="wAttachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" />
+          <div id="attachmentPreview" class="attachment-preview"></div>
+        </div>
         <div class="write-footer">
           <button class="btn-ghost" onclick="App.openBoard(${currentBoardId})">취소</button>
           <button class="btn-primary" onclick="App.submitPost(${isEdit ? postId : 'null'})">${isEdit ? '수정 완료' : '등록'}</button>
@@ -757,6 +775,30 @@ const App = (() => {
       </div>`;
 
     showView('write');
+
+    // 첨부파일 미리보기 이벤트
+    const fileInput = document.getElementById('wAttachments');
+    const previewDiv = document.getElementById('attachmentPreview');
+    fileInput.addEventListener('change', function(e) {
+      previewDiv.innerHTML = '';
+      Array.from(e.target.files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'attachment-thumb';
+            previewDiv.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          const div = document.createElement('div');
+          div.className = 'attachment-file';
+          div.innerHTML = `${fileIcon(file.type)} ${file.name}`;
+          previewDiv.appendChild(div);
+        }
+      });
+    });
   }
 
   function renderReceptionForm(rd = {}) {
@@ -856,6 +898,18 @@ const App = (() => {
         savedId = res.id;
         toast('게시글이 등록되었습니다.', 'success');
       }
+
+      // 첨부파일 업로드
+      const fileInput = document.getElementById('wAttachments');
+      if (fileInput && fileInput.files.length > 0) {
+        for (let file of fileInput.files) {
+          const formData = new FormData();
+          formData.append('file', file);
+          await API.post(`/api/attachments/upload?post_id=${savedId}`, formData);
+        }
+        toast('첨부파일이 업로드되었습니다.', 'success');
+      }
+
       await loadPost(savedId, currentBoardId);
     } catch (err) {
       toast(err.message, 'error');
@@ -1101,7 +1155,7 @@ const App = (() => {
     init, goHome,
     openBoard, loadPosts, loadPost, goPage,
     openWriteView, openEditView, submitPost, deletePost,
-    uploadFiles, downloadFile, deleteFile,
+    uploadFiles, downloadFile, deleteFile, viewImage,
     changeStatus, changeAssign,
     replyTo, cancelReply, editComment, deleteComment,
     exportCSV,
