@@ -1,18 +1,14 @@
 /**
  * bahEMR2 대시보드 — 메인 SPA 컨트롤러
  *
- * 구조:
- *  App.init()          → 앱 초기화 (인증확인, 유저정보 로드)
- *  App.showView(name)  → 뷰 전환 (home | board | post | write | users | companies)
- *  App.loadBoards()    → 사이드바 게시판 목록
- *  App.loadHome()      → 대시보드 홈 통계
- *  App.loadPosts()     → 게시판 목록
- *  App.loadPost(id)    → 게시글 상세
- *  App.openWriteView() → 글쓰기 폼
- *  각종 모달/관리 기능
+ * 변경사항:
+ *  - 프로필 편집 모달 기능 추가 (openProfileModal, closeProfileModal, submitProfile 등)
+ *  - 글쓰기 첨부파일 업로드 순서 수정 (글 저장 후 → 파일 업로드)
+ *  - 댓글 첨부파일 업로드 API 수정 (comment_id 파라미터 사용)
+ *  - 사이드바 아바타에 프로필 이미지 반영
  */
 const App = (() => {
-  let currentUser   = null;
+  let currentUser    = null;
   let currentBoardId = null;
   let currentPostId  = null;
   let currentPage    = 1;
@@ -21,10 +17,10 @@ const App = (() => {
   let companyList    = [];
   let editingCompanyId = null;
 
-  // ── 유틸 ──────────────────────────────────────────────────
+  // ── 유틸 ──────────────────────────────────────────────────────────
   function toast(msg, type = 'info') {
-    const tc   = document.getElementById('toastContainer');
-    const div  = document.createElement('div');
+    const tc  = document.getElementById('toastContainer');
+    const div = document.createElement('div');
     const icons = { success: '✅', error: '❌', info: 'ℹ️' };
     div.className = `toast toast-${type}`;
     div.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span>${msg}</span>`;
@@ -45,9 +41,9 @@ const App = (() => {
   }
 
   function fileSize(bytes) {
-    if (bytes < 1024)       return bytes + ' B';
-    if (bytes < 1024*1024)  return (bytes/1024).toFixed(1) + ' KB';
-    return (bytes/1024/1024).toFixed(1) + ' MB';
+    if (bytes < 1024)        return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
   }
 
   function fileIcon(mime) {
@@ -68,12 +64,25 @@ const App = (() => {
     return `<span class="badge ${STATUS_BADGE[status] || 'badge-general'}">${STATUS_LABEL[status] || status}</span>`;
   }
 
-  // ── 뷰 전환 ──────────────────────────────────────────────
+  function esc(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ── 뷰 전환 ───────────────────────────────────────────────────────
   function showView(name) {
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
     const el = document.getElementById(`view-${name}`);
-    if (el) { el.style.display = ''; el.style.animation = 'none'; requestAnimationFrame(() => { el.style.animation = ''; }); }
-    // 사이드바 active 상태
+    if (el) {
+      el.style.display = '';
+      el.style.animation = 'none';
+      requestAnimationFrame(() => { el.style.animation = ''; });
+    }
     document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
     if (name === 'home') document.getElementById('navHome')?.classList.add('active');
   }
@@ -87,38 +96,54 @@ const App = (() => {
       ).join('');
   }
 
-  // ── 초기화 ────────────────────────────────────────────────
+  // ── 사이드바 아바타 업데이트 ──────────────────────────────────────
+  function updateSidebarAvatar(user) {
+    const avatarEl = document.getElementById('sbAvatar');
+    if (!avatarEl) return;
+    if (user.profile_image) {
+      avatarEl.innerHTML = `<img src="${user.profile_image}" alt="프로필" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      avatarEl.style.background = 'none';
+      avatarEl.style.padding = '0';
+    } else {
+      const initial = (user.name || '?').charAt(0).toUpperCase();
+      avatarEl.innerHTML = initial;
+      avatarEl.style.background = '';
+      avatarEl.style.padding = '';
+    }
+    document.getElementById('sbName').textContent = user.name;
+    document.getElementById('sbRole').textContent = ROLE_LABEL[user.role] || user.role;
+  }
+
+  // ── 초기화 ────────────────────────────────────────────────────────
   async function init() {
     const token = API.getToken();
-    const user = API.getUser();
+    const user  = API.getUser();
 
     if (!token || !user) {
-      console.error('토큰 또는 유저 정보 없음 → 로그인 페이지로');
       window.location.href = '/index.html';
       return;
     }
 
     currentUser = user;
 
-    // UI 사용자 정보 표시
-    const initial = (user.name || '?').charAt(0).toUpperCase();
-    document.getElementById('sbAvatar').textContent = initial;
-    document.getElementById('sbName').textContent   = user.name;
-    document.getElementById('sbRole').textContent   = ROLE_LABEL[user.role] || user.role;
+    updateSidebarAvatar(user);
     document.getElementById('welcomeMsg').textContent = `${user.name}님, 환영합니다.`;
 
     if (user.company_name) {
       const cb = document.getElementById('companyBadge');
-      cb.textContent  = user.company_name;
+      cb.textContent   = user.company_name;
       cb.style.display = '';
     }
 
-    if (['superadmin','admin'].includes(user.role)) {
+    if (['superadmin', 'admin'].includes(user.role)) {
       document.getElementById('sbAdminSection').style.display = '';
     }
     if (user.role === 'superadmin') {
       document.getElementById('sbCreateBoard').style.display = '';
     }
+
+    // 아바타 클릭 → 프로필 모달
+    document.getElementById('sbAvatar').addEventListener('click', openProfileModal);
 
     document.getElementById('sbLogout').addEventListener('click', logout);
     document.getElementById('navHome').addEventListener('click', (e) => { e.preventDefault(); goHome(); });
@@ -146,12 +171,12 @@ const App = (() => {
       await loadHome();
       showView('home');
     } catch (err) {
-      console.error('🚨 대시보드 로드 중 치명적 에러:', err);
+      console.error('대시보드 로드 에러:', err);
       alert('로드 실패: ' + (err.message || err));
     }
   }
 
-  // ── 사이드바 ──────────────────────────────────────────────
+  // ── 사이드바 ──────────────────────────────────────────────────────
   function openSidebar() {
     document.getElementById('sidebar').classList.add('open');
     document.getElementById('sbOverlay').classList.add('show');
@@ -161,13 +186,119 @@ const App = (() => {
     document.getElementById('sbOverlay').classList.remove('show');
   }
 
-  // ── 로그아웃 ─────────────────────────────────────────────
   function logout() {
     API.clearToken();
     window.location.href = '/index.html';
   }
 
-  // ── 대시보드 홈 ───────────────────────────────────────────
+  // ── 프로필 편집 모달 ──────────────────────────────────────────────
+  function openProfileModal() {
+    const user = currentUser;
+    const modal = document.getElementById('modalProfile');
+
+    // 현재 값 채우기
+    document.getElementById('pfName').value  = user.name  || '';
+    document.getElementById('pfEmail').value = user.email || '';
+    document.getElementById('pfPassword').value        = '';
+    document.getElementById('pfPasswordConfirm').value = '';
+
+    // 프로필 이미지 미리보기
+    const preview = document.getElementById('pfImagePreview');
+    if (user.profile_image) {
+      preview.innerHTML = `<img src="${user.profile_image}" alt="프로필" />`;
+    } else {
+      preview.innerHTML = `<span class="pf-image-placeholder">${(user.name||'?').charAt(0).toUpperCase()}</span>`;
+    }
+
+    // 파일 입력 초기화
+    document.getElementById('pfImageInput').value = '';
+
+    modal.style.display = 'flex';
+  }
+
+  function closeProfileModal() {
+    document.getElementById('modalProfile').style.display = 'none';
+  }
+
+  function handleProfileImageChange(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast('이미지 크기는 2MB 이하여야 합니다.', 'error');
+      input.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const preview = document.getElementById('pfImagePreview');
+      preview.innerHTML = `<img src="${e.target.result}" alt="미리보기" />`;
+      preview.dataset.newImage = e.target.result; // base64 저장
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeProfileImage() {
+    const preview = document.getElementById('pfImagePreview');
+    preview.innerHTML = `<span class="pf-image-placeholder">${(currentUser.name||'?').charAt(0).toUpperCase()}</span>`;
+    preview.dataset.newImage = 'remove';
+    document.getElementById('pfImageInput').value = '';
+  }
+
+  async function submitProfile() {
+    const name     = document.getElementById('pfName').value.trim();
+    const email    = document.getElementById('pfEmail').value.trim();
+    const password = document.getElementById('pfPassword').value;
+    const passwordConfirm = document.getElementById('pfPasswordConfirm').value;
+    const preview  = document.getElementById('pfImagePreview');
+
+    if (!name)  { toast('이름을 입력하세요.', 'error'); return; }
+    if (!email) { toast('이메일을 입력하세요.', 'error'); return; }
+
+    if (password || passwordConfirm) {
+      if (password.length < 6) { toast('비밀번호는 6자 이상이어야 합니다.', 'error'); return; }
+      if (password !== passwordConfirm) { toast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+    }
+
+    const body = { name, email };
+    if (password) body.password = password;
+
+    // 이미지 처리
+    const newImage = preview.dataset.newImage;
+    if (newImage === 'remove') {
+      body.profile_image = null;
+    } else if (newImage && newImage.startsWith('data:')) {
+      body.profile_image = newImage;
+    }
+
+    const btn = document.querySelector('#modalProfile .btn-primary');
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+
+    try {
+      const res = await API.patch('/api/users/profile', body);
+
+      // 로컬 스토리지 유저 정보 갱신
+      const updatedUser = { ...currentUser, ...res.user };
+      currentUser = updatedUser;
+      API.setUser(updatedUser);
+
+      // 사이드바 즉시 반영
+      updateSidebarAvatar(updatedUser);
+      document.getElementById('welcomeMsg').textContent = `${updatedUser.name}님, 환영합니다.`;
+
+      toast('프로필이 저장되었습니다.', 'success');
+      closeProfileModal();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '저장';
+    }
+  }
+
+  // ── 대시보드 홈 ───────────────────────────────────────────────────
   async function goHome() {
     showView('home');
     setBreadcrumb([]);
@@ -181,20 +312,17 @@ const App = (() => {
     try {
       const data = await API.get('/api/stats/dashboard');
 
-      // 통계
       if (data.user_count !== null) {
         document.getElementById('statCard1').style.display = '';
         document.getElementById('statCard2').style.display = '';
         document.getElementById('statUsers').textContent  = data.user_count;
         document.getElementById('statBoards').textContent = data.board_count;
       }
-      document.getElementById('statPosts').textContent   = data.post_count;
+      document.getElementById('statPosts').textContent = data.post_count;
 
-      // 대기 중 접수 수
       const pending = (data.status_stats || []).find(s => s.status === 'submitted');
       document.getElementById('statPending').textContent = pending ? pending.cnt : 0;
 
-      // 접수 상태 현황
       if (data.status_stats && data.status_stats.length > 0) {
         const panel = document.getElementById('statusPanel');
         panel.style.display = '';
@@ -211,7 +339,6 @@ const App = (() => {
         `).join('');
       }
 
-      // 최근 게시글
       const listEl = document.getElementById('recentList');
       if (!data.recent_posts || data.recent_posts.length === 0) {
         listEl.innerHTML = '<div class="loading-row">최근 게시글이 없습니다.</div>';
@@ -230,7 +357,7 @@ const App = (() => {
     }
   }
 
-  // ── 게시판 사이드바 로드 ──────────────────────────────────
+  // ── 게시판 사이드바 로드 ──────────────────────────────────────────
   async function loadBoards() {
     try {
       const data = await API.get('/api/boards');
@@ -257,7 +384,7 @@ const App = (() => {
     }
   }
 
-  // ── 게시판 열기 ───────────────────────────────────────────
+  // ── 게시판 열기 ───────────────────────────────────────────────────
   async function openBoard(boardId) {
     closeSidebar();
     currentBoardId = boardId;
@@ -267,20 +394,16 @@ const App = (() => {
     document.getElementById('boardTitle').textContent = board.name || '게시판';
     document.getElementById('boardDesc').textContent  = board.description || '';
 
-    // 접수 게시판이면 상태 필터 + CSV 버튼 표시
     const isReception = board.type === 'reception';
     document.getElementById('statusFilter').style.display = isReception ? '' : 'none';
     document.getElementById('thStatus').style.display     = isReception ? '' : 'none';
     document.getElementById('thCompany').style.display    = ['superadmin','admin','staff'].includes(currentUser.role) ? '' : 'none';
     document.getElementById('btnExport').style.display    = (isReception && ['superadmin','admin','staff'].includes(currentUser.role)) ? '' : 'none';
-
-    // 쓰기 권한 확인
-    document.getElementById('btnWrite').style.display = board.can_write ? '' : 'none';
+    document.getElementById('btnWrite').style.display     = board.can_write ? '' : 'none';
 
     setBreadcrumb([{ label: board.name }]);
     showView('board');
 
-    // 사이드바 active
     document.querySelectorAll('.sb-item-board').forEach(el => {
       el.classList.toggle('active', parseInt(el.dataset.boardId) === boardId);
     });
@@ -288,7 +411,7 @@ const App = (() => {
     await loadPosts();
   }
 
-  // ── 게시글 목록 로드 ──────────────────────────────────────
+  // ── 게시글 목록 로드 ──────────────────────────────────────────────
   async function loadPosts() {
     if (!currentBoardId) return;
     const keyword = document.getElementById('searchInput').value.trim();
@@ -324,7 +447,7 @@ const App = (() => {
       tbody.innerHTML = posts.map((p, i) => {
         const num     = total - ((currentPage - 1) * 20) - i;
         const pinIcon = p.is_pinned ? '<span class="td-pinned">📌</span>' : '';
-        const cmt     = p.comment_count > 0 ? `<span class="td-cmt">💬${p.comment_count}</span>` : '';
+        const cmt     = p.comment_count    > 0 ? `<span class="td-cmt">💬${p.comment_count}</span>`    : '';
         const att     = p.attachment_count > 0 ? `<span class="td-att">📎${p.attachment_count}</span>` : '';
         return `
           <tr onclick="App.loadPost(${p.id}, ${p.board_id})">
@@ -341,7 +464,6 @@ const App = (() => {
       }).join('');
     }
 
-    // 페이지네이션
     const totalPages = Math.ceil(total / 20);
     const pagEl = document.getElementById('pagination');
     if (totalPages <= 1) { pagEl.innerHTML = ''; return; }
@@ -361,11 +483,9 @@ const App = (() => {
     window.scrollTo(0, 0);
   }
 
-  // ── 게시글 상세 ───────────────────────────────────────────
+  // ── 게시글 상세 ───────────────────────────────────────────────────
   async function loadPost(postId, boardId) {
-    if (boardId && boardId !== currentBoardId) {
-      currentBoardId = boardId;
-    }
+    if (boardId && boardId !== currentBoardId) currentBoardId = boardId;
     currentPostId = postId;
     showView('post');
     document.getElementById('postDetail').innerHTML = '<div class="loading-row" style="padding:40px">불러오는 중...</div>';
@@ -375,16 +495,15 @@ const App = (() => {
       const post  = data.post;
       const rd    = data.reception_data;
       const board = boards.find(b => b.id === post.board_id) || {};
-      const isOwner   = post.author_id === currentUser.sub;
-      const isAdmin   = ['superadmin','admin'].includes(currentUser.role);
-      const isStaff   = ['superadmin','admin','staff'].includes(currentUser.role);
+      const isOwner = post.author_id === currentUser.sub;
+      const isAdmin = ['superadmin','admin'].includes(currentUser.role);
+      const isStaff = ['superadmin','admin','staff'].includes(currentUser.role);
 
       setBreadcrumb([
         { label: board.name || '게시판', fn: `App.openBoard(${post.board_id}); return false;` },
         { label: post.title }
       ]);
 
-      // 사이드바 active
       document.querySelectorAll('.sb-item-board').forEach(el => {
         el.classList.toggle('active', parseInt(el.dataset.boardId) === post.board_id);
       });
@@ -412,7 +531,6 @@ const App = (() => {
           </div>
         </div>`;
 
-      // 접수 정보 (reception 게시판)
       if (post.board_type === 'reception' && rd) {
         html += `
           <div class="reception-box">
@@ -431,9 +549,7 @@ const App = (() => {
           </div>`;
       }
 
-      // 상태 변경 바 (staff 이상)
       if (isStaff && post.board_type === 'reception') {
-        // 담당자 목록 로드
         if (!staffList.length) await loadStaffList();
         html += `
           <div class="status-change-bar">
@@ -452,70 +568,46 @@ const App = (() => {
           </div>`;
       }
 
-      // 본문
       html += `<div class="post-body">${esc(post.content)}</div>`;
-
-      // 첨부파일
       html += renderAttachments(data.attachments, post.author_id === currentUser.sub || isAdmin);
-
-      // 상태 이력
-      if (data.history && data.history.length > 0) {
-        html += `
-          <div class="history-section">
-            <h4>처리 이력</h4>
-            <div class="history-list">
-              ${data.history.map(h => `
-                <div class="history-item">
-                  <div class="history-dot hd-${h.to_status}"></div>
-                  <div class="history-text">
-                    <strong>${esc(h.changed_by_name)}</strong>
-                    ${h.from_status ? `<span style="color:var(--muted)"> · ${STATUS_LABEL[h.from_status]||h.from_status} → </span>` : ' · '}
-                    <span>${STATUS_LABEL[h.to_status]||h.to_status}</span>
-                    ${h.memo ? `<span style="color:var(--muted)"> — ${esc(h.memo)}</span>` : ''}
-                  </div>
-                  <span class="history-time">${fmtDateTime(h.created_at)}</span>
-                </div>`).join('')}
-            </div>
-          </div>`;
-      }
-
-      // 댓글
+      html += renderHistory(data.history);
       html += await renderCommentsHtml(postId);
 
       document.getElementById('postDetail').innerHTML = html;
 
       // 파일 업로드 이벤트
-      const dropZone = document.getElementById('dropZone');
+      const dropZone  = document.getElementById('dropZone');
       const fileInput = document.getElementById('fileInput');
       if (dropZone && fileInput) {
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
         dropZone.addEventListener('drop', (e) => {
-          e.preventDefault(); dropZone.classList.remove('dragover');
+          e.preventDefault();
+          dropZone.classList.remove('dragover');
           uploadFiles(Array.from(e.dataTransfer.files));
         });
         fileInput.addEventListener('change', () => uploadFiles(Array.from(fileInput.files)));
       }
 
-      // 댓글 폼 제출
+      // 댓글 폼
       const commentForm = document.getElementById('commentForm');
       if (commentForm) {
         commentForm.addEventListener('submit', submitComment);
       }
-      
+
       // 댓글 파일 미리보기
-      const commentFileInput = document.getElementById('commentAttachments');
+      const commentFileInput  = document.getElementById('commentAttachments');
       const commentPreviewDiv = document.getElementById('commentAttachmentPreview');
       if (commentFileInput && commentPreviewDiv) {
-        commentFileInput.addEventListener('change', function(e) {
+        commentFileInput.addEventListener('change', (e) => {
           commentPreviewDiv.innerHTML = '';
           Array.from(e.target.files).forEach(file => {
             if (file.type.startsWith('image/')) {
               const reader = new FileReader();
-              reader.onload = function(e) {
+              reader.onload = (ev) => {
                 const img = document.createElement('img');
-                img.src = e.target.result;
+                img.src = ev.target.result;
                 img.className = 'attachment-thumb';
                 commentPreviewDiv.appendChild(img);
               };
@@ -536,16 +628,19 @@ const App = (() => {
   }
 
   function renderAttachments(attachments, canDelete) {
-    const isStaff = ['superadmin','admin','staff'].includes(currentUser.role);
+    const isStaff   = ['superadmin','admin','staff'].includes(currentUser.role);
     const canUpload = isStaff || currentUser.role === 'partner';
     return `
       <div class="attach-section">
         <h4>첨부파일 (${attachments.length})</h4>
         <div class="attach-list" id="attachList">
-          ${attachments.length === 0 ? '<div style="color:var(--muted);font-size:13px">첨부파일 없음</div>' :
-            attachments.map(a => `
+          ${attachments.length === 0
+            ? '<div style="color:var(--muted);font-size:13px">첨부파일 없음</div>'
+            : attachments.map(a => `
               <div class="attach-item" id="att-${a.id}">
-                ${a.mime_type.startsWith('image/') ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" />` : `<span class="attach-icon">${fileIcon(a.mime_type)}</span>`}
+                ${a.mime_type.startsWith('image/')
+                  ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" />`
+                  : `<span class="attach-icon">${fileIcon(a.mime_type)}</span>`}
                 <div class="attach-info">
                   <div class="attach-name">${esc(a.filename)}</div>
                   <div class="attach-size">${fileSize(a.file_size)}</div>
@@ -559,10 +654,31 @@ const App = (() => {
           <div style="margin-top:10px">
             <div class="file-drop-zone" id="dropZone">
               <p>여기에 파일을 끌어다 놓거나 <strong>클릭하여 업로드</strong></p>
-              <p style="font-size:11px;margin-top:4px">PDF, 이미지, Word, Excel · 최대 20MB · 게시글당 10개</p>
+              <p style="font-size:11px;margin-top:4px">PDF, 이미지, Word, Excel · 최대 5MB · 게시글당 10개</p>
             </div>
             <input type="file" id="fileInput" class="file-input-hidden" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv" />
           </div>` : ''}
+      </div>`;
+  }
+
+  function renderHistory(history) {
+    if (!history || !history.length) return '';
+    return `
+      <div class="history-section">
+        <h4>처리 이력</h4>
+        <div class="history-list">
+          ${history.map(h => `
+            <div class="history-item">
+              <div class="history-dot hd-${h.to_status}"></div>
+              <div class="history-text">
+                <strong>${esc(h.changed_by_name)}</strong>
+                ${h.from_status ? `<span style="color:var(--muted)"> · ${STATUS_LABEL[h.from_status]||h.from_status} → </span>` : ' · '}
+                <span>${STATUS_LABEL[h.to_status]||h.to_status}</span>
+                ${h.memo ? `<span style="color:var(--muted)"> — ${esc(h.memo)}</span>` : ''}
+              </div>
+              <span class="history-time">${fmtDateTime(h.created_at)}</span>
+            </div>`).join('')}
+        </div>
       </div>`;
   }
 
@@ -576,20 +692,23 @@ const App = (() => {
       const renderComment = (c) => {
         const isOwner = c.author_id === currentUser.sub;
         const isAdmin = ['superadmin','admin'].includes(currentUser.role);
-        const reps = replies.filter(r => r.parent_id === c.id);
-        const attachments = c.attachments || [];
-        const attachmentHtml = attachments.length > 0 ? `
-          <div class="comment-attachments" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">
-            ${attachments.map(a => `
-              <div class="comment-attach-item" style="position:relative">
-                ${a.mime_type.startsWith('image/') 
-                  ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
-                  : `<div class="attach-icon" style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`
-                }
-                <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
-              </div>
-            `).join('')}
-          </div>` : '';
+        const reps    = replies.filter(r => r.parent_id === c.id);
+
+        const attachmentHtml = (attachments) => {
+          if (!attachments || !attachments.length) return '';
+          return `
+            <div class="comment-attachments" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">
+              ${attachments.map(a => `
+                <div class="comment-attach-item">
+                  ${a.mime_type.startsWith('image/')
+                    ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
+                    : `<div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`
+                  }
+                  <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
+                </div>`).join('')}
+            </div>`;
+        };
+
         return `
           <div class="comment-item ${c.is_deleted ? 'is-deleted' : ''}" id="cmt-${c.id}">
             <div class="comment-header">
@@ -598,7 +717,7 @@ const App = (() => {
               <span class="comment-time">${fmtDateTime(c.created_at)}</span>
             </div>
             <div class="comment-body">${esc(c.content)}</div>
-            ${attachmentHtml}
+            ${attachmentHtml(c.attachments)}
             ${!c.is_deleted ? `
               <div class="comment-actions">
                 <button class="comment-btn" onclick="App.replyTo(${c.id}, '${esc(c.author_name)}')">답글</button>
@@ -606,43 +725,30 @@ const App = (() => {
                 ${isOwner || isAdmin ? `<button class="comment-btn danger" onclick="App.deleteComment(${c.id})">삭제</button>` : ''}
               </div>` : ''}
           </div>
-          ${reps.map(r => {
-            const raAttachments = r.attachments || [];
-            const raAttachmentHtml = raAttachments.length > 0 ? `
-              <div class="comment-attachments" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">
-                ${raAttachments.map(a => `
-                  <div class="comment-attach-item" style="position:relative">
-                    ${a.mime_type.startsWith('image/') 
-                      ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
-                      : `<div class="attach-icon" style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`
-                    }
-                    <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
-                  </div>
-                `).join('')}
-              </div>` : '';
-            return `
-              <div class="comment-item is-reply ${r.is_deleted?'is-deleted':''}" id="cmt-${r.id}">
-                <div class="comment-header">
-                  <span class="comment-author">${esc(r.author_name)}</span>
-                  <span class="comment-role">${ROLE_LABEL[r.author_role]||r.author_role}</span>
-                  <span class="comment-time">${fmtDateTime(r.created_at)}</span>
-                </div>
-                <div class="comment-body">${esc(r.content)}</div>
-                ${raAttachmentHtml}
-                ${!r.is_deleted ? `
-                  <div class="comment-actions">
-                    ${(r.author_id===currentUser.sub||['superadmin','admin'].includes(currentUser.role)) ? `<button class="comment-btn" onclick="App.editComment(${r.id}, this)">수정</button>` : ''}
-                    ${(r.author_id===currentUser.sub||['superadmin','admin'].includes(currentUser.role)) ? `<button class="comment-btn danger" onclick="App.deleteComment(${r.id})">삭제</button>` : ''}
-                  </div>` : ''}
-              </div>`;
-          }).join('')}`;
+          ${reps.map(r => `
+            <div class="comment-item is-reply ${r.is_deleted?'is-deleted':''}" id="cmt-${r.id}">
+              <div class="comment-header">
+                <span class="comment-author">${esc(r.author_name)}</span>
+                <span class="comment-role">${ROLE_LABEL[r.author_role]||r.author_role}</span>
+                <span class="comment-time">${fmtDateTime(r.created_at)}</span>
+              </div>
+              <div class="comment-body">${esc(r.content)}</div>
+              ${attachmentHtml(r.attachments)}
+              ${!r.is_deleted ? `
+                <div class="comment-actions">
+                  ${(r.author_id===currentUser.sub||isAdmin) ? `<button class="comment-btn" onclick="App.editComment(${r.id}, this)">수정</button>` : ''}
+                  ${(r.author_id===currentUser.sub||isAdmin) ? `<button class="comment-btn danger" onclick="App.deleteComment(${r.id})">삭제</button>` : ''}
+                </div>` : ''}
+            </div>`).join('')}`;
       };
 
       return `
         <div class="comment-section">
           <h4>댓글 (${comments.filter(c => !c.is_deleted).length})</h4>
           <div class="comment-list" id="commentList">
-            ${topLevel.length === 0 ? '<div style="color:var(--muted);font-size:13px">댓글이 없습니다.</div>' : topLevel.map(renderComment).join('')}
+            ${topLevel.length === 0
+              ? '<div style="color:var(--muted);font-size:13px">댓글이 없습니다.</div>'
+              : topLevel.map(renderComment).join('')}
           </div>
           <form class="comment-form" id="commentForm">
             <div id="replyIndicator" style="display:none;font-size:12px;color:var(--primary);margin-bottom:6px"></div>
@@ -669,14 +775,14 @@ const App = (() => {
   function replyTo(parentId, authorName) {
     document.getElementById('replyParentId').value = parentId;
     const ind = document.getElementById('replyIndicator');
-    ind.textContent = `↩ ${authorName}님에게 답글 작성 중`;
+    ind.textContent  = `↩ ${authorName}님에게 답글 작성 중`;
     ind.style.display = '';
     document.getElementById('cancelReplyBtn').style.display = '';
     document.getElementById('commentInput').focus();
   }
 
   function cancelReply() {
-    document.getElementById('replyParentId').value = '';
+    document.getElementById('replyParentId').value    = '';
     document.getElementById('replyIndicator').style.display = 'none';
     document.getElementById('cancelReplyBtn').style.display = 'none';
   }
@@ -688,32 +794,35 @@ const App = (() => {
     if (!content) { toast('댓글 내용을 입력하세요.', 'error'); return; }
 
     try {
-      const res = await API.post('/api/comments', { post_id: currentPostId, content, parent_id: parentId ? parseInt(parentId) : null });
+      const res = await API.post('/api/comments', {
+        post_id:   currentPostId,
+        content,
+        parent_id: parentId ? parseInt(parentId) : null
+      });
       const commentId = res.id;
-      
-      // 첨부파일 업로드
+
+      // 댓글 첨부파일 업로드 (comment_id 파라미터 사용)
       const fileInput = document.getElementById('commentAttachments');
       if (fileInput && fileInput.files.length > 0) {
-        for (let file of fileInput.files) {
+        for (const file of fileInput.files) {
           const formData = new FormData();
           formData.append('file', file);
           try {
-            await API.post(`/api/attachments/upload?comment_id=${commentId}`, formData);
+            await API.upload(`/api/attachments/upload?comment_id=${commentId}`, formData);
           } catch (err) {
-            console.warn(`파일 업로드 실패: ${file.name}`, err);
+            console.warn(`댓글 파일 업로드 실패: ${file.name}`, err);
           }
         }
       }
-      
+
       toast('댓글이 등록되었습니다.', 'success');
-      // 폼 초기화
       document.getElementById('commentInput').value = '';
       document.getElementById('commentAttachments').value = '';
       document.getElementById('commentAttachmentPreview').innerHTML = '';
       document.getElementById('replyParentId').value = '';
-      document.getElementById('replyIndicator').style.display = 'none';
-      document.getElementById('cancelReplyBtn').style.display = 'none';
-      
+      document.getElementById('replyIndicator').style.display  = 'none';
+      document.getElementById('cancelReplyBtn').style.display  = 'none';
+
       await loadPost(currentPostId, currentBoardId);
     } catch (err) {
       toast(err.message, 'error');
@@ -724,7 +833,6 @@ const App = (() => {
     const item    = document.getElementById(`cmt-${commentId}`);
     const bodyEl  = item.querySelector('.comment-body');
     const current = bodyEl.textContent;
-
     bodyEl.innerHTML = `<textarea style="width:100%;background:var(--bg);border:1px solid var(--primary);border-radius:6px;color:var(--text);font-family:var(--font);font-size:13px;padding:8px;resize:vertical;outline:none" rows="3">${current}</textarea>`;
     btn.textContent = '저장';
     btn.onclick = async () => {
@@ -747,7 +855,7 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── 파일 업로드/다운로드/삭제 ────────────────────────────
+  // ── 파일 업로드/다운로드/삭제 ────────────────────────────────────
   async function uploadFiles(files) {
     for (const file of files) {
       const fd = new FormData();
@@ -776,8 +884,7 @@ const App = (() => {
       <div class="image-modal-content">
         <img src="/api/attachments/${attId}" alt="${esc(filename)}" />
         <button class="image-modal-close" onclick="this.parentElement.parentElement.remove()">✕</button>
-      </div>
-    `;
+      </div>`;
     document.body.appendChild(modal);
   }
 
@@ -790,7 +897,7 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── 상태/담당자 변경 ──────────────────────────────────────
+  // ── 상태/담당자 변경 ──────────────────────────────────────────────
   async function changeStatus() {
     const status = document.getElementById('postStatusSel').value;
     try {
@@ -809,26 +916,26 @@ const App = (() => {
 
   async function loadStaffList() {
     try {
-      const data = await API.get('/api/users?role=staff');
-      staffList  = data.users || [];
+      const data   = await API.get('/api/users?role=staff');
+      staffList    = data.users || [];
       const admins = await API.get('/api/users?role=admin');
-      staffList = [...staffList, ...(admins.users||[])];
+      staffList    = [...staffList, ...(admins.users || [])];
     } catch { staffList = []; }
   }
 
-  // ── 글쓰기 뷰 ─────────────────────────────────────────────
+  // ── 글쓰기 뷰 ─────────────────────────────────────────────────────
   async function openWriteView(postId = null) {
-    const board     = boards.find(b => b.id === currentBoardId) || {};
+    const board       = boards.find(b => b.id === currentBoardId) || {};
     const isReception = board.type === 'reception';
-    const isEdit    = !!postId;
-    let editData    = null;
+    const isEdit      = !!postId;
+    let editData      = null;
 
     if (isEdit) {
       const data = await API.get(`/api/posts/${postId}`);
       editData = data;
     }
 
-    const p = editData?.post || {};
+    const p  = editData?.post || {};
     const rd = editData?.reception_data || {};
 
     setBreadcrumb([
@@ -851,29 +958,29 @@ const App = (() => {
           <textarea id="wContent" placeholder="내용을 입력하세요">${esc(p.content||'')}</textarea>
         </div>
         <div class="form-group">
-          <label>첨부파일</label>
+          <label>첨부파일 <span style="font-size:11px;color:var(--muted);font-weight:normal">(글 저장 후 자동 업로드 · 최대 5MB · 최대 10개)</span></label>
           <input type="file" id="wAttachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" />
           <div id="attachmentPreview" class="attachment-preview"></div>
         </div>
         <div class="write-footer">
           <button class="btn-ghost" onclick="App.openBoard(${currentBoardId})">취소</button>
-          <button class="btn-primary" onclick="App.submitPost(${isEdit ? postId : 'null'})">${isEdit ? '수정 완료' : '등록'}</button>
+          <button class="btn-primary" id="btnSubmitPost" onclick="App.submitPost(${isEdit ? postId : 'null'})">${isEdit ? '수정 완료' : '등록'}</button>
         </div>
       </div>`;
 
     showView('write');
 
-    // 첨부파일 미리보기 이벤트
-    const fileInput = document.getElementById('wAttachments');
+    // 첨부파일 미리보기
+    const fileInput  = document.getElementById('wAttachments');
     const previewDiv = document.getElementById('attachmentPreview');
-    fileInput.addEventListener('change', function(e) {
+    fileInput.addEventListener('change', (e) => {
       previewDiv.innerHTML = '';
       Array.from(e.target.files).forEach(file => {
         if (file.type.startsWith('image/')) {
           const reader = new FileReader();
-          reader.onload = function(e) {
+          reader.onload = (ev) => {
             const img = document.createElement('img');
-            img.src = e.target.result;
+            img.src = ev.target.result;
             img.className = 'attachment-thumb';
             previewDiv.appendChild(img);
           };
@@ -921,11 +1028,11 @@ const App = (() => {
             <label>신분증 종류</label>
             <select id="rdIdType">
               <option value="">선택</option>
-              <option value="passport"  ${rd.id_type==='passport' ?'selected':''}>여권 (Passport)</option>
-              <option value="alien_reg" ${rd.id_type==='alien_reg'?'selected':''}>외국인등록증</option>
-              <option value="id_card"   ${rd.id_type==='id_card'  ?'selected':''}>신분증</option>
-              <option value="shore_pass"${rd.id_type==='shore_pass'?'selected':''}>Shore Pass (상륙증)</option>
-              <option value="other"     ${rd.id_type==='other'    ?'selected':''}>기타</option>
+              <option value="passport"   ${rd.id_type==='passport'  ?'selected':''}>여권 (Passport)</option>
+              <option value="alien_reg"  ${rd.id_type==='alien_reg' ?'selected':''}>외국인등록증</option>
+              <option value="id_card"    ${rd.id_type==='id_card'   ?'selected':''}>신분증</option>
+              <option value="shore_pass" ${rd.id_type==='shore_pass'?'selected':''}>Shore Pass (상륙증)</option>
+              <option value="other"      ${rd.id_type==='other'     ?'selected':''}>기타</option>
             </select>
           </div>
           <div class="form-group">
@@ -948,6 +1055,11 @@ const App = (() => {
       </div>`;
   }
 
+  /**
+   * 글쓰기/수정 제출
+   * 핵심 수정: 글을 먼저 저장한 뒤 savedId를 받아 파일 업로드
+   * (기존 코드는 API.post()로 FormData를 잘못 처리했음)
+   */
   async function submitPost(postId) {
     const title   = document.getElementById('wTitle')?.value.trim();
     const content = document.getElementById('wContent')?.value.trim();
@@ -965,41 +1077,62 @@ const App = (() => {
         patient_name:        name,
         patient_dob:         document.getElementById('rdDob')?.value    || null,
         patient_gender:      document.getElementById('rdGender')?.value || null,
-        patient_phone:       document.getElementById('rdPhone')?.value.trim()  || null,
-        patient_nationality: document.getElementById('rdNation')?.value.trim() || null,
+        patient_phone:       document.getElementById('rdPhone')?.value.trim()     || null,
+        patient_nationality: document.getElementById('rdNation')?.value.trim()    || null,
         id_type:             document.getElementById('rdIdType')?.value  || null,
-        id_number:           document.getElementById('rdIdNum')?.value.trim()  || null,
-        vessel_name:         document.getElementById('rdVessel')?.value.trim() || null,
-        port_of_call:        document.getElementById('rdPort')?.value.trim()   || null,
+        id_number:           document.getElementById('rdIdNum')?.value.trim()     || null,
+        vessel_name:         document.getElementById('rdVessel')?.value.trim()    || null,
+        port_of_call:        document.getElementById('rdPort')?.value.trim()      || null,
         chief_complaint:     document.getElementById('rdComplaint')?.value.trim() || null,
       };
     }
 
+    const btn = document.getElementById('btnSubmitPost');
+    if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+
     try {
       let savedId = postId;
+
+      // ① 글 저장 (JSON)
       if (postId) {
-        await API.patch(`/api/posts/${postId}`, { title, content: content || '(접수 폼 데이터 참조)', reception_data });
+        await API.patch(`/api/posts/${postId}`, {
+          title,
+          content: content || '(접수 폼 데이터 참조)',
+          reception_data
+        });
         toast('게시글이 수정되었습니다.', 'success');
       } else {
-        const res = await API.post('/api/posts', { board_id: currentBoardId, title, content: content || '(접수 폼 데이터 참조)', reception_data });
+        const res = await API.post('/api/posts', {
+          board_id: currentBoardId,
+          title,
+          content: content || '(접수 폼 데이터 참조)',
+          reception_data
+        });
         savedId = res.id;
         toast('게시글이 등록되었습니다.', 'success');
       }
 
-      // 첨부파일 업로드
+      // ② 파일 업로드 (savedId 확보 후 → FormData로 별도 전송)
       const fileInput = document.getElementById('wAttachments');
       if (fileInput && fileInput.files.length > 0) {
-        for (let file of fileInput.files) {
+        let uploadCount = 0;
+        for (const file of fileInput.files) {
           const formData = new FormData();
           formData.append('file', file);
-          await API.post(`/api/attachments/upload?post_id=${savedId}`, formData);
+          try {
+            await API.upload(`/api/attachments/upload?post_id=${savedId}`, formData);
+            uploadCount++;
+          } catch (err) {
+            toast(`${file.name} 업로드 실패: ${err.message}`, 'error');
+          }
         }
-        toast('첨부파일이 업로드되었습니다.', 'success');
+        if (uploadCount > 0) toast(`첨부파일 ${uploadCount}개 업로드 완료`, 'success');
       }
 
       await loadPost(savedId, currentBoardId);
     } catch (err) {
       toast(err.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = postId ? '수정 완료' : '등록'; }
     }
   }
 
@@ -1016,7 +1149,7 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── CSV 내보내기 ──────────────────────────────────────────
+  // ── CSV 내보내기 ──────────────────────────────────────────────────
   async function exportCSV() {
     const status = document.getElementById('statusFilter').value;
     const params = new URLSearchParams({ board_id: currentBoardId, ...(status ? { status } : {}) });
@@ -1026,7 +1159,7 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── 게시판 생성 모달 ──────────────────────────────────────
+  // ── 게시판 생성 모달 ──────────────────────────────────────────────
   function openCreateBoardModal() {
     document.getElementById('modalCreateBoard').style.display = 'flex';
   }
@@ -1051,7 +1184,7 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── 사용자 관리 뷰 ────────────────────────────────────────
+  // ── 사용자 관리 뷰 ────────────────────────────────────────────────
   async function loadUsersView() {
     showView('users');
     setBreadcrumb([{ label: '사용자 관리' }]);
@@ -1063,15 +1196,21 @@ const App = (() => {
       const rows = (data.users || []).map(u => `
         <tr>
           <td>${u.id}</td>
-          <td>${esc(u.name)}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${u.profile_image
+                ? `<img src="${u.profile_image}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0" />`
+                : `<div style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#0d1117;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${(u.name||'?').charAt(0).toUpperCase()}</div>`
+              }
+              ${esc(u.name)}
+            </div>
+          </td>
           <td style="font-family:var(--mono);font-size:12px">${esc(u.email)}</td>
           <td>${esc(u.company_name||'-')}</td>
           <td><span class="badge ${u.role==='superadmin'?'badge-accepted':u.role==='pending'?'badge-rejected':'badge-submitted'}">${ROLE_LABEL[u.role]||u.role}</span></td>
           <td><span style="color:${u.is_active?'var(--success)':'var(--error)'}">●</span> ${u.is_active?'활성':'비활성'}</td>
           <td style="font-size:12px;color:var(--muted)">${fmtDate(u.created_at)}</td>
-          <td>
-            <button class="btn-ghost btn-sm" onclick="App.openUserEdit(${u.id})">수정</button>
-          </td>
+          <td><button class="btn-ghost btn-sm" onclick="App.openUserEdit(${u.id})">수정</button></td>
         </tr>`).join('');
 
       el.innerHTML = `
@@ -1095,7 +1234,10 @@ const App = (() => {
     modal.id = 'modalUserEdit';
     modal.innerHTML = `
       <div class="modal">
-        <div class="modal-header"><h2>사용자 수정 — ${esc(u.name)}</h2><button class="modal-x" onclick="document.getElementById('modalUserEdit').remove()">✕</button></div>
+        <div class="modal-header">
+          <h2>사용자 수정 — ${esc(u.name)}</h2>
+          <button class="modal-x" onclick="document.getElementById('modalUserEdit').remove()">✕</button>
+        </div>
         <div class="modal-body">
           <div class="mf-group"><label>역할</label>
             <select id="ueRole">
@@ -1136,9 +1278,9 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── 관계사 관리 뷰 ────────────────────────────────────────
+  // ── 관계사 관리 ───────────────────────────────────────────────────
   async function loadCompanyList() {
-    const data = await API.get('/api/companies');
+    const data  = await API.get('/api/companies');
     companyList = data.companies || [];
     return companyList;
   }
@@ -1203,7 +1345,6 @@ const App = (() => {
     const contact = document.getElementById('cmContact').value.trim();
     const memo    = document.getElementById('cmMemo').value.trim();
     if (!name) { toast('관계사명을 입력하세요.', 'error'); return; }
-
     try {
       if (editingCompanyId) {
         await API.patch(`/api/companies/${editingCompanyId}`, { name, type, contact, memo });
@@ -1226,18 +1367,7 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── XSS 방지 ─────────────────────────────────────────────
-  function esc(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  // ── Public API ────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────
   return {
     init, goHome,
     openBoard, loadPosts, loadPost, goPage,
@@ -1250,12 +1380,13 @@ const App = (() => {
     openUserEdit, saveUserEdit,
     openCompanyModal, closeCompanyModal, submitCompany, deleteCompany,
     loadCompaniesView, loadUsersView,
-    // toast 노출
+    // 프로필
+    openProfileModal, closeProfileModal,
+    handleProfileImageChange, removeProfileImage, submitProfile,
     toast
   };
 })();
 
-// 앱 초기화
 document.addEventListener('DOMContentLoaded', () => {
   const token = localStorage.getItem('bahemr_token');
   if (!token) { window.location.href = '/index.html'; return; }
