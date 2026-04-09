@@ -116,3 +116,26 @@ VALUES
   (1, '공지사항',   '시스템 공지 및 안내사항',     'notice',    'all',   'admin', 1, 1),
   (2, '자유게시판', '자유롭게 의견을 나누는 공간', 'general',   'all',   'all',   2, 1),
   (3, '접수게시판', 'EMR 사전접수 데이터 제출',    'reception', 'staff', 'all',   3, 1);
+
+
+-- ================================================================
+-- Migration: 002_add_profile_and_comment_attachments.sql
+-- 실행:
+--   wrangler d1 execute bahemr2-db --remote --file=migrations/002_add_profile_and_comment_attachments.sql
+--   wrangler d1 execute bahemr2-db --local  --file=migrations/002_add_profile_and_comment_attachments.sql
+-- ================================================================
+
+-- 1. users 테이블에 profile_image 컬럼 추가
+ALTER TABLE users ADD COLUMN profile_image TEXT;
+
+-- 2. attachments 테이블에 comment_id 컬럼 추가 (댓글 첨부파일 지원)
+ALTER TABLE attachments ADD COLUMN comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE;
+
+-- 3. post_id를 NULL 허용으로 (댓글 전용 첨부파일은 post_id가 없을 수 있음)
+-- ※ SQLite는 ALTER COLUMN을 지원하지 않으므로 기존 데이터는 유지되고
+--    새 업로드 시 comment_id만 있는 경우 post_id = NULL 허용
+-- (Cloudflare D1은 이미 post_id에 NOT NULL 제약이 없을 경우 별도 처리 불필요)
+
+-- 4. 인덱스 추가
+CREATE INDEX IF NOT EXISTS idx_attachments_comment_id ON attachments(comment_id);
+CREATE INDEX IF NOT EXISTS idx_users_profile ON users(id) WHERE profile_image IS NOT NULL;
