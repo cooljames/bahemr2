@@ -316,6 +316,7 @@ input, select, textarea { font-family: var(--font); }
   flex: 1;
   padding: 24px;
   width: 100%;
+  overflow-x: hidden;
 }
 
 .view { animation: fadeIn .25s ease; }
@@ -533,10 +534,11 @@ input, select, textarea { font-family: var(--font); }
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  align-items: center;
 }
 .search-input {
   flex: 1;
-  min-width: 200px;
+  min-width: 180px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -597,12 +599,12 @@ input, select, textarea { font-family: var(--font); }
 .post-table tbody tr { cursor: pointer; transition: background .12s; }
 .post-table tbody tr:hover { background: rgba(255,255,255,.025); }
 
-.col-num    { width: 60px; }
-.col-title  { }
-.col-status { width: 90px; }
-.col-author { width: 100px; }
-.col-company{ width: 120px; }
-.col-date   { width: 100px; white-space: nowrap; }
+.col-num    { width: 5%; min-width: 50px; }
+.col-title  { width: 40%; }
+.col-status { width: 12%; min-width: 80px; }
+.col-author { width: 18%; min-width: 90px; }
+.col-company{ width: 15%; min-width: 80px; }
+.col-date   { width: 10%; min-width: 80px; white-space: nowrap; }
 
 .td-num { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .td-title { display: flex; align-items: center; gap: 8px; }
@@ -900,7 +902,36 @@ input, select, textarea { font-family: var(--font); }
   transition: border-color .2s;
 }
 .comment-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,200,150,.08); }
-.comment-form-footer { display: flex; justify-content: flex-end; }
+
+.comment-file-section {
+  background: var(--surface2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.comment-file-input {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+
+.comment-file-input:hover {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.comment-file-input input[type="file"] {
+  cursor: pointer;
+}
+
+.comment-form-footer { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* ════════════════════════════════
    글쓰기 뷰
@@ -1141,6 +1172,10 @@ input, select, textarea { font-family: var(--font); }
 /* ════════════════════════════════
    반응형
 ════════════════════════════════ */
+@media (max-width: 1024px) {
+  .col-company { display: none !important; }
+}
+
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
@@ -1155,17 +1190,107 @@ input, select, textarea { font-family: var(--font); }
   .content-area { padding: 16px; }
   .stat-grid  { grid-template-columns: 1fr 1fr; }
   .form-grid  { grid-template-columns: 1fr; }
-  .post-table th:nth-child(3),
-  .post-table td:nth-child(3) { display: none; }
+  
+  /* 테이블을 카드 형식으로 변경 */
+  .table-wrap {
+    border: none;
+    background: transparent;
+    overflow-x: auto;
+  }
+  
+  .post-table {
+    display: block;
+  }
+  
+  .post-table thead {
+    display: none;
+  }
+  
+  .post-table tbody {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .post-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    border-bottom: none;
+    gap: 12px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  
+  .post-table tbody tr:hover {
+    background: var(--surface2);
+    border-color: var(--border);
+  }
+  
+  .post-table tbody tr.empty-td {
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+  }
+  
+  .post-table td {
+    padding: 0;
+    border: none;
+    border-bottom: none;
+  }
+  
+  .post-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 11px;
+    display: block;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  
+  .post-table .td-num::before { content: '번호'; }
+  .post-table td:nth-child(2)::before { content: '제목 및 메타'; }
+  .post-table td:nth-child(3)::before { content: '상태'; }
+  .post-table td:nth-child(4)::before { content: '작성자'; }
+  .post-table td:nth-child(5)::before { content: '관계사'; }
+  .post-table td:nth-child(6)::before { content: '날짜'; }
+  
+  .post-table .td-num {
+    font-size: 14px;
+    color: var(--text);
+  }
+  
+  .post-table .td-title {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .post-table .td-title-text {
+    font-size: 15px;
+  }
+  
+  .post-table .td-meta {
+    flex-wrap: wrap;
+  }
+  
   .mf-row { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
-  .stat-grid  { grid-template-columns: 1fr; }
-  .page-header { flex-direction: column; }
-  .page-actions { width: 100%; }
-  .reception-grid { grid-template-columns: 1fr 1fr; }
+  .post-table tbody tr {
+    padding: 14px;
+  }
+  
+  .post-table .td-title-text {
+    font-size: 14px;
+  }
 }
+
+
 
 /* 첨부파일 미리보기 */
 .attachment-preview {

@@ -328,15 +328,15 @@ const App = (() => {
         const att     = p.attachment_count > 0 ? `<span class="td-att">📎${p.attachment_count}</span>` : '';
         return `
           <tr onclick="App.loadPost(${p.id}, ${p.board_id})">
-            <td class="td-num">${p.is_pinned ? '📌' : num}</td>
-            <td>
+            <td class="td-num" data-label="번호">${p.is_pinned ? '📌' : num}</td>
+            <td data-label="제목 및 메타">
               <div class="td-title">${pinIcon}<span class="td-title-text">${esc(p.title)}</span></div>
               <div class="td-meta">${cmt}${att}</div>
             </td>
-            <td style="display:${board.type==='reception'?'':'none'}">${badgeHtml(p.status)}</td>
-            <td>${esc(p.author_name)}</td>
-            <td style="display:${isAdmin?'':'none'}">${esc(p.company_name||'-')}</td>
-            <td class="td-date">${fmtDate(p.created_at)}</td>
+            <td data-label="상태" style="display:${board.type==='reception'?'':'none'}">${badgeHtml(p.status)}</td>
+            <td data-label="작성자">${esc(p.author_name)}</td>
+            <td data-label="관계사" style="display:${isAdmin?'':'none'}">${esc(p.company_name||'-')}</td>
+            <td class="td-date" data-label="날짜">${fmtDate(p.created_at)}</td>
           </tr>`;
       }).join('');
     }
@@ -503,6 +503,32 @@ const App = (() => {
       if (commentForm) {
         commentForm.addEventListener('submit', submitComment);
       }
+      
+      // 댓글 파일 미리보기
+      const commentFileInput = document.getElementById('commentAttachments');
+      const commentPreviewDiv = document.getElementById('commentAttachmentPreview');
+      if (commentFileInput && commentPreviewDiv) {
+        commentFileInput.addEventListener('change', function(e) {
+          commentPreviewDiv.innerHTML = '';
+          Array.from(e.target.files).forEach(file => {
+            if (file.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'attachment-thumb';
+                commentPreviewDiv.appendChild(img);
+              };
+              reader.readAsDataURL(file);
+            } else {
+              const div = document.createElement('div');
+              div.className = 'attachment-file';
+              div.innerHTML = `${fileIcon(file.type)} ${file.name}`;
+              commentPreviewDiv.appendChild(div);
+            }
+          });
+        });
+      }
 
     } catch (err) {
       document.getElementById('postDetail').innerHTML = `<div class="empty-state"><p style="color:var(--error)">${err.message}</p></div>`;
@@ -551,6 +577,19 @@ const App = (() => {
         const isOwner = c.author_id === currentUser.sub;
         const isAdmin = ['superadmin','admin'].includes(currentUser.role);
         const reps = replies.filter(r => r.parent_id === c.id);
+        const attachments = c.attachments || [];
+        const attachmentHtml = attachments.length > 0 ? `
+          <div class="comment-attachments" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">
+            ${attachments.map(a => `
+              <div class="comment-attach-item" style="position:relative">
+                ${a.mime_type.startsWith('image/') 
+                  ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
+                  : `<div class="attach-icon" style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`
+                }
+                <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
+              </div>
+            `).join('')}
+          </div>` : '';
         return `
           <div class="comment-item ${c.is_deleted ? 'is-deleted' : ''}" id="cmt-${c.id}">
             <div class="comment-header">
@@ -559,6 +598,7 @@ const App = (() => {
               <span class="comment-time">${fmtDateTime(c.created_at)}</span>
             </div>
             <div class="comment-body">${esc(c.content)}</div>
+            ${attachmentHtml}
             ${!c.is_deleted ? `
               <div class="comment-actions">
                 <button class="comment-btn" onclick="App.replyTo(${c.id}, '${esc(c.author_name)}')">답글</button>
@@ -566,20 +606,36 @@ const App = (() => {
                 ${isOwner || isAdmin ? `<button class="comment-btn danger" onclick="App.deleteComment(${c.id})">삭제</button>` : ''}
               </div>` : ''}
           </div>
-          ${reps.map(r => `
-            <div class="comment-item is-reply ${r.is_deleted?'is-deleted':''}" id="cmt-${r.id}">
-              <div class="comment-header">
-                <span class="comment-author">${esc(r.author_name)}</span>
-                <span class="comment-role">${ROLE_LABEL[r.author_role]||r.author_role}</span>
-                <span class="comment-time">${fmtDateTime(r.created_at)}</span>
-              </div>
-              <div class="comment-body">${esc(r.content)}</div>
-              ${!r.is_deleted ? `
-                <div class="comment-actions">
-                  ${(r.author_id===currentUser.sub||['superadmin','admin'].includes(currentUser.role)) ? `<button class="comment-btn" onclick="App.editComment(${r.id}, this)">수정</button>` : ''}
-                  ${(r.author_id===currentUser.sub||['superadmin','admin'].includes(currentUser.role)) ? `<button class="comment-btn danger" onclick="App.deleteComment(${r.id})">삭제</button>` : ''}
-                </div>` : ''}
-            </div>`).join('')}`;
+          ${reps.map(r => {
+            const raAttachments = r.attachments || [];
+            const raAttachmentHtml = raAttachments.length > 0 ? `
+              <div class="comment-attachments" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">
+                ${raAttachments.map(a => `
+                  <div class="comment-attach-item" style="position:relative">
+                    ${a.mime_type.startsWith('image/') 
+                      ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id}, '${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
+                      : `<div class="attach-icon" style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`
+                    }
+                    <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
+                  </div>
+                `).join('')}
+              </div>` : '';
+            return `
+              <div class="comment-item is-reply ${r.is_deleted?'is-deleted':''}" id="cmt-${r.id}">
+                <div class="comment-header">
+                  <span class="comment-author">${esc(r.author_name)}</span>
+                  <span class="comment-role">${ROLE_LABEL[r.author_role]||r.author_role}</span>
+                  <span class="comment-time">${fmtDateTime(r.created_at)}</span>
+                </div>
+                <div class="comment-body">${esc(r.content)}</div>
+                ${raAttachmentHtml}
+                ${!r.is_deleted ? `
+                  <div class="comment-actions">
+                    ${(r.author_id===currentUser.sub||['superadmin','admin'].includes(currentUser.role)) ? `<button class="comment-btn" onclick="App.editComment(${r.id}, this)">수정</button>` : ''}
+                    ${(r.author_id===currentUser.sub||['superadmin','admin'].includes(currentUser.role)) ? `<button class="comment-btn danger" onclick="App.deleteComment(${r.id})">삭제</button>` : ''}
+                  </div>` : ''}
+              </div>`;
+          }).join('')}`;
       };
 
       return `
@@ -592,6 +648,13 @@ const App = (() => {
             <div id="replyIndicator" style="display:none;font-size:12px;color:var(--primary);margin-bottom:6px"></div>
             <input type="hidden" id="replyParentId" value="" />
             <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="3"></textarea>
+            <div class="comment-file-section" style="margin-top:8px;margin-bottom:8px">
+              <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">파일 첨부 (선택사항)</label>
+              <div class="comment-file-input">
+                <input type="file" id="commentAttachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="font-size:12px" />
+              </div>
+              <div id="commentAttachmentPreview" class="attachment-preview" style="margin-top:8px"></div>
+            </div>
             <div class="comment-form-footer">
               <button type="button" class="btn-ghost btn-sm" id="cancelReplyBtn" style="display:none;margin-right:8px" onclick="App.cancelReply()">취소</button>
               <button type="submit" class="btn-primary btn-sm">댓글 등록</button>
@@ -622,11 +685,35 @@ const App = (() => {
     e.preventDefault();
     const content  = document.getElementById('commentInput').value.trim();
     const parentId = document.getElementById('replyParentId').value || null;
-    if (!content) return;
+    if (!content) { toast('댓글 내용을 입력하세요.', 'error'); return; }
 
     try {
-      await API.post('/api/comments', { post_id: currentPostId, content, parent_id: parentId ? parseInt(parentId) : null });
+      const res = await API.post('/api/comments', { post_id: currentPostId, content, parent_id: parentId ? parseInt(parentId) : null });
+      const commentId = res.id;
+      
+      // 첨부파일 업로드
+      const fileInput = document.getElementById('commentAttachments');
+      if (fileInput && fileInput.files.length > 0) {
+        for (let file of fileInput.files) {
+          const formData = new FormData();
+          formData.append('file', file);
+          try {
+            await API.post(`/api/attachments/upload?comment_id=${commentId}`, formData);
+          } catch (err) {
+            console.warn(`파일 업로드 실패: ${file.name}`, err);
+          }
+        }
+      }
+      
       toast('댓글이 등록되었습니다.', 'success');
+      // 폼 초기화
+      document.getElementById('commentInput').value = '';
+      document.getElementById('commentAttachments').value = '';
+      document.getElementById('commentAttachmentPreview').innerHTML = '';
+      document.getElementById('replyParentId').value = '';
+      document.getElementById('replyIndicator').style.display = 'none';
+      document.getElementById('cancelReplyBtn').style.display = 'none';
+      
       await loadPost(currentPostId, currentBoardId);
     } catch (err) {
       toast(err.message, 'error');
