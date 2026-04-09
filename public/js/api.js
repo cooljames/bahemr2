@@ -27,9 +27,18 @@ const API = (() => {
     catch { return null; }
   }
 
-  async function request(method, path, body, isFormData = false) {
+  /**
+   * 핵심 요청 함수
+   * body가 FormData이면 Content-Type 헤더를 설정하지 않음
+   * (브라우저가 multipart/form-data + boundary를 자동으로 처리)
+   */
+  async function request(method, path, body) {
     const headers = { Authorization: `Bearer ${getToken()}` };
-    if (!isFormData) headers['Content-Type'] = 'application/json';
+
+    const isFormData = body instanceof FormData;
+    if (body && !isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     const init = { method, headers };
     if (body) {
@@ -44,8 +53,8 @@ const API = (() => {
       return;
     }
 
-    let data;
     const ct = res.headers.get('content-type') || '';
+    let data;
     if (ct.includes('application/json')) {
       data = await res.json();
     } else {
@@ -60,18 +69,23 @@ const API = (() => {
     return data;
   }
 
+  /** 파일 업로드 전용 (FormData) */
+  async function upload(path, formData) {
+    return request('POST', path, formData);
+  }
+
   return {
     getToken, setToken, clearToken,
     setUser,  getUser,
 
-    get:    (path)         => request('GET',    path),
-    post:   (path, body)   => request('POST',   path, body),
-    put:    (path, body)   => request('PUT',    path, body),
-    patch:  (path, body)   => request('PATCH',  path, body),
-    delete: (path)         => request('DELETE', path),
-    upload: (path, formData) => request('POST', path, formData, true),
+    get:    (path)        => request('GET',    path),
+    post:   (path, body)  => request('POST',   path, body),
+    put:    (path, body)  => request('PUT',    path, body),
+    patch:  (path, body)  => request('PATCH',  path, body),
+    delete: (path)        => request('DELETE', path),
+    upload,
 
-    /** CSV 다운로드용 */
+    /** CSV / 일반 다운로드 */
     async download(path, filename) {
       const res = await fetch(BASE + path, {
         headers: { Authorization: `Bearer ${getToken()}` }
