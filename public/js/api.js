@@ -1,6 +1,6 @@
 /**
  * bahEMR API 클라이언트
- * 모든 fetch 요청을 래핑 — JWT 자동 첨부, 에러 처리
+ * 모든 fetch 요청을 래핑 — JWT 자동 첨부, 에러 처리.
  */
 const API = (() => {
   const BASE = '';  // same-origin
