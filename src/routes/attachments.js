@@ -1,7 +1,7 @@
 import { json } from '../index.js';
 import { isAdmin } from '../utils/auth.js';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // D1 row 제한 고려 → 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = [
   'image/jpeg','image/png','image/gif','image/webp',
   'application/pdf',
@@ -14,65 +14,120 @@ const ALLOWED_TYPES = [
 
 export async function handleAttachments(request, env, user, path) {
   const method = request.method;
+  const url    = new URL(request.url);
 
-  // POST /api/attachments/upload?post_id=
+  // ── POST /api/attachments/upload?post_id= 또는 ?comment_id= ──────
   if (path === '/api/attachments/upload' && method === 'POST') {
-    const url     = new URL(request.url);
-    const post_id = url.searchParams.get('post_id');
-    if (!post_id) return json({ error: 'post_id가 필요합니다.' }, 400);
+    const post_id    = url.searchParams.get('post_id');
+    const comment_id = url.searchParams.get('comment_id');
 
-    // 게시글 소유권 확인
-    const post = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(post_id).first();
-    if (!post) return json({ error: '게시글을 찾을 수 없습니다.' }, 404);
-    if (post.author_id !== user.sub && !isAdmin(user)) return json({ error: '권한이 없습니다.' }, 403);
+    if (!post_id && !comment_id) {
+      return json({ error: 'post_id 또는 comment_id가 필요합니다.' }, 400);
+    }
 
-    const formData = await request.formData();
-    const file     = formData.get('file');
+    // 게시글/댓글 소유권 확인
+    if (post_id) {
+      const post = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(post_id).first();
+      if (!post) return json({ error: '게시글을 찾을 수 없습니다.' }, 404);
+      if (post.author_id !== user.sub && !isAdmin(user)) {
+        return json({ error: '권한이 없습니다.' }, 403);
+      }
+    }
+
+    if (comment_id) {
+      const comment = await env.DB.prepare('SELECT * FROM comments WHERE id = ?').bind(comment_id).first();
+      if (!comment) return json({ error: '댓글을 찾을 수 없습니다.' }, 404);
+      if (comment.author_id !== user.sub && !isAdmin(user)) {
+        return json({ error: '권한이 없습니다.' }, 403);
+      }
+    }
+
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (e) {
+      return json({ error: '파일 데이터를 읽을 수 없습니다: ' + e.message }, 400);
+    }
+
+    const file = formData.get('file');
     if (!file) return json({ error: '파일을 선택하세요.' }, 400);
 
-    if (file.size > MAX_FILE_SIZE) return json({ error: '파일 크기는 5MB 이하여야 합니다.' }, 400);
-    if (!ALLOWED_TYPES.includes(file.type)) return json({ error: '허용되지 않는 파일 형식입니다.' }, 400);
+    // 파일 크기/형식 검증
+    if (file.size > MAX_FILE_SIZE) {
+      return json({ error: '파일 크기는 5MB 이하여야 합니다.' }, 400);
+    }
+
+    const mimeType = file.type || 'application/octet-stream';
+    if (!ALLOWED_TYPES.includes(mimeType)) {
+      return json({ error: `허용되지 않는 파일 형식입니다. (${mimeType})` }, 400);
+    }
 
     // 첨부파일 수 제한 (게시글당 10개)
-    const countRow = await env.DB.prepare(
-      'SELECT COUNT(*) as cnt FROM attachments WHERE post_id = ?'
-    ).bind(post_id).first();
-    if (countRow.cnt >= 10) return json({ error: '첨부파일은 게시글당 최대 10개입니다.' }, 400);
-
-    // 파일 바이너리 → Base64 변환 (D1 TEXT 컬럼에 저장)
-    const buffer = await file.arrayBuffer();
-    const bytes  = new Uint8Array(buffer);
-    let binary   = '';
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-    const base64 = btoa(binary);
-
-    const ext       = file.name.split('.').pop();
-    const storedKey = `posts/${post_id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-
-    // D1에 파일 본문(Base64)과 메타데이터 함께 저장
-    const result = await env.DB.prepare(
-      `INSERT INTO attachments (post_id, uploader_id, filename, stored_key, file_size, mime_type, file_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(post_id, user.sub, file.name, storedKey, file.size, file.type, base64).run();
-
-    return json({
-      message: '파일이 업로드되었습니다.',
-      attachment: {
-        id:        result.meta.last_row_id,
-        filename:  file.name,
-        file_size: file.size,
-        mime_type: file.type
+    if (post_id) {
+      const countRow = await env.DB.prepare(
+        'SELECT COUNT(*) as cnt FROM attachments WHERE post_id = ? AND comment_id IS NULL'
+      ).bind(post_id).first();
+      if (countRow.cnt >= 10) {
+        return json({ error: '첨부파일은 게시글당 최대 10개입니다.' }, 400);
       }
-    }, 201);
+    }
+
+    // 파일 바이너리 → Base64 변환
+    let base64;
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes  = new Uint8Array(buffer);
+      let binary   = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+      }
+      base64 = btoa(binary);
+    } catch (e) {
+      return json({ error: '파일 변환 중 오류가 발생했습니다: ' + e.message }, 500);
+    }
+
+    const ext       = (file.name.split('.').pop() || 'bin').toLowerCase();
+    const storedKey = `posts/${post_id || 'comment'}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+    try {
+      const result = await env.DB.prepare(
+        `INSERT INTO attachments (post_id, comment_id, uploader_id, filename, stored_key, file_size, mime_type, file_data)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        post_id    ? parseInt(post_id)    : null,
+        comment_id ? parseInt(comment_id) : null,
+        user.sub,
+        file.name,
+        storedKey,
+        file.size,
+        mimeType,
+        base64
+      ).run();
+
+      return json({
+        message: '파일이 업로드되었습니다.',
+        attachment: {
+          id:        result.meta.last_row_id,
+          filename:  file.name,
+          file_size: file.size,
+          mime_type: mimeType
+        }
+      }, 201);
+    } catch (e) {
+      return json({ error: 'DB 저장 오류: ' + e.message }, 500);
+    }
   }
 
-  // GET /api/attachments/:id/download
-  const matchDown = path.match(/^\/api\/attachments\/(\d+)\/download$/);
-  if (matchDown && method === 'GET') {
-    const attId = parseInt(matchDown[1]);
+  // ── GET /api/attachments/:id — 인라인 표시 (이미지 등) ───────────
+  const matchGet = path.match(/^\/api\/attachments\/(\d+)$/);
+  if (matchGet && method === 'GET') {
+    const attId = parseInt(matchGet[1]);
     const att   = await env.DB.prepare(
-      `SELECT a.*, p.author_id, p.company_id
-       FROM attachments a JOIN posts p ON p.id = a.post_id
+      `SELECT a.*, p.author_id as post_author_id, p.company_id
+       FROM attachments a
+       LEFT JOIN posts p ON p.id = a.post_id
        WHERE a.id = ?`
     ).bind(attId).first();
 
@@ -83,35 +138,72 @@ export async function handleAttachments(request, env, user, path) {
       return json({ error: '접근 권한이 없습니다.' }, 403);
     }
 
-    // Base64 → 바이너리 복원
-    const binary = atob(att.file_data);
-    const bytes  = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    try {
+      const binary = atob(att.file_data);
+      const bytes  = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-    const encoded = encodeURIComponent(att.filename);
-    return new Response(bytes.buffer, {
-      headers: {
-        'Content-Type':        att.mime_type,
-        'Content-Disposition': `attachment; filename*=UTF-8''${encoded}`,
-        'Content-Length':      String(att.file_size)
-      }
-    });
+      return new Response(bytes.buffer, {
+        headers: {
+          'Content-Type':  att.mime_type,
+          'Cache-Control': 'private, max-age=3600'
+        }
+      });
+    } catch (e) {
+      return json({ error: '파일 읽기 오류: ' + e.message }, 500);
+    }
   }
 
-  // DELETE /api/attachments/:id
+  // ── GET /api/attachments/:id/download ────────────────────────────
+  const matchDown = path.match(/^\/api\/attachments\/(\d+)\/download$/);
+  if (matchDown && method === 'GET') {
+    const attId = parseInt(matchDown[1]);
+    const att   = await env.DB.prepare(
+      `SELECT a.*, p.author_id, p.company_id
+       FROM attachments a
+       LEFT JOIN posts p ON p.id = a.post_id
+       WHERE a.id = ?`
+    ).bind(attId).first();
+
+    if (!att) return json({ error: '파일을 찾을 수 없습니다.' }, 404);
+
+    if (user.role === 'partner' && att.company_id !== user.company_id) {
+      return json({ error: '접근 권한이 없습니다.' }, 403);
+    }
+
+    try {
+      const binary = atob(att.file_data);
+      const bytes  = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+      const encoded = encodeURIComponent(att.filename);
+      return new Response(bytes.buffer, {
+        headers: {
+          'Content-Type':        att.mime_type,
+          'Content-Disposition': `attachment; filename*=UTF-8''${encoded}`,
+          'Content-Length':      String(att.file_size)
+        }
+      });
+    } catch (e) {
+      return json({ error: '파일 다운로드 오류: ' + e.message }, 500);
+    }
+  }
+
+  // ── DELETE /api/attachments/:id ───────────────────────────────────
   const matchDel = path.match(/^\/api\/attachments\/(\d+)$/);
   if (matchDel && method === 'DELETE') {
     const attId = parseInt(matchDel[1]);
     const att   = await env.DB.prepare(
-      `SELECT a.*, p.author_id FROM attachments a JOIN posts p ON p.id = a.post_id WHERE a.id = ?`
+      `SELECT a.*, p.author_id FROM attachments a
+       LEFT JOIN posts p ON p.id = a.post_id WHERE a.id = ?`
     ).bind(attId).first();
 
     if (!att) return json({ error: '파일을 찾을 수 없습니다.' }, 404);
-    if (att.uploader_id !== user.sub && !isAdmin(user)) return json({ error: '삭제 권한이 없습니다.' }, 403);
+    if (att.uploader_id !== user.sub && !isAdmin(user)) {
+      return json({ error: '삭제 권한이 없습니다.' }, 403);
+    }
 
-    // D1에서만 삭제 (R2 불필요)
     await env.DB.prepare('DELETE FROM attachments WHERE id = ?').bind(attId).run();
-
     return json({ message: '파일이 삭제되었습니다.' });
   }
 
