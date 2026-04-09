@@ -1,5 +1,18 @@
-import { json } from '../index.js';
-import { signJWT, hashPassword, checkPassword } from '../utils/auth.js';
+import { signJWT, hashPassword, checkPassword, verifyJWT } from '../utils/auth.js';
+
+// 순환 참조 방지를 위해 json 헬퍼 함수를 상단에 직접 선언 (또는 utils/response.js 등으로 분리 권장)
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
 
 export async function handleAuth(request, env, path) {
   const method = request.method;
@@ -10,7 +23,6 @@ export async function handleAuth(request, env, path) {
       const { email, password } = await request.json();
       if (!email || !password) return json({ error: '이메일과 비밀번호를 입력하세요.' }, 400);
 
-      // 1. DB 조회 에러 추적
       let user;
       try {
         user = await env.DB.prepare(
@@ -32,10 +44,8 @@ export async function handleAuth(request, env, path) {
         return json({ error: '관리자 승인 대기 중입니다. 담당자에게 문의하세요.' }, 403);
       }
 
-// 2. JWT 발급 에러 추적
       let token;
       try {
-        // env.JWT_SECRET이 비어있으면 뒤에 있는 임시 문자열을 사용하도록 '||' 추가
         const secretKey = env.JWT_SECRET || 'my_temporary_secret_key_12345'; 
         
         token = await signJWT({
@@ -93,7 +103,7 @@ export async function handleAuth(request, env, path) {
   // GET /api/auth/me — 토큰으로 사용자 정보 조회
   if (path === '/api/auth/me' && method === 'GET') {
     try {
-      const { verifyJWT } = await import('../utils/auth.js');
+      // (수정) 동적 import 제거, 상단 정적 import 사용
       const user = await verifyJWT(request, env);
       if (!user) return json({ error: '인증이 필요합니다.' }, 401);
 
@@ -112,7 +122,7 @@ export async function handleAuth(request, env, path) {
     }
   }
 
-  // GET /api/auth/companies-public — 회원가입 시 관계사 목록 (인증 불필요)
+  // GET /api/auth/companies-public
   if (path === '/api/auth/companies-public' && method === 'GET') {
     try {
       const rows = await env.DB.prepare(
