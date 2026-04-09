@@ -89,6 +89,21 @@ const App = (() => {
 
   // ── 초기화 ────────────────────────────────────────────────
   async function init() {
+  console.log('=== Dashboard Init Debug ===');
+  console.log('Token exists:', !!localStorage.getItem('bahemr_token'));
+  console.log('User exists:', !!localStorage.getItem('bahemr_user'));
+  
+  const token = API.getToken();
+  const user = API.getUser();
+  console.log('Parsed Token:', token ? token.substring(0, 30) + '...' : null);
+  console.log('Parsed User:', user);
+
+  if (!token || !user) {
+    console.error('Redirecting to login because token or user is missing');
+    window.location.href = '/index.html';
+    return;
+  }
+
     const user = API.getUser();
     if (!user) { window.location.href = '/index.html'; return; }
     const token = API.getToken();
