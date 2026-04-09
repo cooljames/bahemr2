@@ -89,6 +89,41 @@ const App = (() => {
 
   // ── 초기화 ────────────────────────────────────────────────
   async function init() {
+
+  console.log('=== Dashboard Init Start ===');
+  
+  const token = localStorage.getItem('bahemr_token');
+  const userStr = localStorage.getItem('bahemr_user');
+  console.log('Token:', token ? token.substring(0, 50) + '...' : '없음');
+  console.log('User:', userStr ? JSON.parse(userStr) : '없음');
+
+  if (!token || !userStr) {
+    console.error('토큰 또는 유저 정보 없음 → 로그인 페이지로');
+    window.location.href = '/index.html';
+    return;
+  }
+
+  currentUser = JSON.parse(userStr);
+
+  // ==================== 디버그용 ====================
+  try {
+    console.log('1. 게시판 로드 시작...');
+    await loadBoards();
+    console.log('2. 게시판 로드 완료');
+
+    console.log('3. 홈 데이터 로드 시작...');
+    await loadHome();
+    console.log('4. 홈 데이터 로드 완료');
+
+    showView('home');
+    console.log('=== Dashboard Init 성공 ===');
+  } catch (err) {
+    console.error('🚨 대시보드 로드 중 치명적 에러:', err);
+    alert('로드 실패: ' + err.message);   // 팝업으로도 확인
+  }
+}
+    
+    
   console.log('=== Dashboard Init Debug ===');
   console.log('Token exists:', !!localStorage.getItem('bahemr_token'));
   console.log('User exists:', !!localStorage.getItem('bahemr_user'));
