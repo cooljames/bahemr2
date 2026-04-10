@@ -7,6 +7,28 @@
  *  - 댓글 첨부파일 업로드 API 수정 (comment_id 파라미터 사용)
  *  - 사이드바 아바타에 프로필 이미지 반영
  */
+
+// 페이지 로드 시 또는 로그인 직후 실행되는 부분
+let currentUser = null;
+
+async function initApp() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    location.href = '/index.html'; // 로그인 안 되어 있으면 튕겨냄
+    return;
+  }
+
+  // 내 프로필 정보를 가져와서 역할을 확인 (앞서 만든 /api/profile 활용)
+  const res = await fetch('/api/profile', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const data = await res.json();
+  currentUser = data.user; // 여기서 role 정보('superadmin')가 담깁니다.
+
+  // 유저 정보 로드 후 게시판 목록 호출
+  loadBoards();
+}
+
 const App = (() => {
   let currentUser    = null;
   let currentBoardId = null;
