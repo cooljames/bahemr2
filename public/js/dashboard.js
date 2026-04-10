@@ -1440,7 +1440,7 @@ async function deleteBoard(boardId, boardName) {
     openCreateBoardModal, closeCreateBoardModal, submitCreateBoard,
     openUserEdit, saveUserEdit,
     openCompanyModal, closeCompanyModal, submitCompany, deleteCompany,
-    loadCompaniesView, loadUsersView,
+    loadCompaniesView, loadUsersView, loadBoardManageView, deleteBoard,
     openProfileModal, closeProfileModal,
     handleProfileImageChange, removeProfileImage, submitProfile,
     applyTheme,
