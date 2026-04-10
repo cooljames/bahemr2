@@ -379,32 +379,59 @@ const App = (() => {
     }
   }
 
-  // ── 게시판 사이드바 로드 ──────────────────────────────────────────
-  async function loadBoards() {
-    try {
-      const data = await API.get('/api/boards');
-      boards = data.boards || [];
+// ── 게시판 사이드바 로드 ──────────────────────────────────────────
+async function loadBoards() {
+  try {
+    const data = await API.get('/api/boards');
+    boards = data.boards || [];
 
-      const listEl = document.getElementById('sbBoardList');
-      if (!boards.length) {
-        listEl.innerHTML = '<div style="padding:8px 10px;font-size:12px;color:var(--muted)">게시판 없음</div>';
-        return;
+    const listEl = document.getElementById('sbBoardList');
+    if (!boards.length) {
+      listEl.innerHTML = '<div style="padding:8px 10px;font-size:12px;color:var(--muted)">게시판 없음</div>';
+      return;
+    }
+
+    // [체크포인트] 현재 로그인한 유저 정보를 확인하는 변수를 지정하세요.
+    // 프로젝트 구조에 따라 App.currentUser, user, authUser 등 다를 수 있습니다.
+    const isSuperAdmin = window.currentUser && window.currentUser.role === 'superadmin';
+
+    listEl.innerHTML = boards.map(b => {
+      const icon = b.type === 'notice' ? '📢' : b.type === 'reception' ? '📋' : '💬';
+      
+      // 1. 기본 게시판 항목 HTML 
+      let html = `
+        <a href="#" class="sb-item sb-item-board" data-board-id="${b.id}"
+           onclick="App.openBoard(${b.id}); return false;" 
+           style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size:14px;flex-shrink:0">${icon}</span>
+          <span style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(b.name)}</span>
+          ${b.post_count > 0 ? `<span style="font-size:10px;font-family:var(--mono);color:var(--muted)">${b.post_count}</span>` : ''}
+      `;
+
+      // 2. [추가] 최고 관리자(superadmin)인 경우에만 삭제(휴지통) 아이콘 렌더링
+      if (isSuperAdmin) {
+        html += `
+          <button onclick="event.stopPropagation(); App.deleteBoard(${b.id}); return false;" 
+                  title="게시판 삭제" 
+                  style="background:transparent; border:none; color:#ef4444; cursor:pointer; padding:2px; margin-left:auto; display:flex; align-items:center; opacity:0.7;"
+                  onmouseover="this.style.opacity='1'" 
+                  onmouseout="this.style.opacity='0.7'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        `;
       }
 
-      listEl.innerHTML = boards.map(b => {
-        const icon = b.type === 'notice' ? '📢' : b.type === 'reception' ? '📋' : '💬';
-        return `
-          <a href="#" class="sb-item sb-item-board" data-board-id="${b.id}"
-             onclick="App.openBoard(${b.id}); return false;">
-            <span style="font-size:14px;flex-shrink:0">${icon}</span>
-            <span>${esc(b.name)}</span>
-            ${b.post_count > 0 ? `<span style="margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--muted)">${b.post_count}</span>` : ''}
-          </a>`;
-      }).join('');
-    } catch (err) {
-      document.getElementById('sbBoardList').innerHTML = '<div style="padding:8px 10px;font-size:12px;color:var(--error)">로드 실패</div>';
-    }
+      html += `</a>`;
+      return html;
+    }).join('');
+    
+  } catch (err) {
+    document.getElementById('sbBoardList').innerHTML = '<div style="padding:8px 10px;font-size:12px;color:var(--error)">로드 실패</div>';
   }
+}
 
   // ── 게시판 열기 ───────────────────────────────────────────────────
   async function openBoard(boardId) {
