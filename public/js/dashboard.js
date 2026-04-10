@@ -175,6 +175,7 @@ const App = (() => {
     }
     if (user.role === 'superadmin') {
       document.getElementById('sbCreateBoard').style.display = '';
+      document.getElementById('sbBoardManageHome').style.display = '';      
     }
 
     document.getElementById('sbAvatar')?.addEventListener('click', openProfileModal);
@@ -190,6 +191,7 @@ const App = (() => {
         const view = el.dataset.view;
         if      (view === 'users')     loadUsersView();
         else if (view === 'companies') loadCompaniesView();
+        else if (view === 'board-manage') loadBoardManageView();          
         else if (view === 'home')      goHome();
         closeSidebar();
       });
@@ -416,7 +418,8 @@ const App = (() => {
       });
 
       let html = `
-        <div class="post-header">
+        <div class="post-header section-card section-title">
+          <div class="section-chip section-chip-title">제목</div>
           <div class="post-title">${esc(post.title)}</div>
           <div class="post-meta-row">
             <span class="post-meta-item">
@@ -475,7 +478,12 @@ const App = (() => {
           </div>`;
       }
 
-      html += `<div class="post-body">${esc(post.content)}</div>`;
+      html += `
+        <div class="post-body-section section-card section-body">
+          <h4>본문</h4>
+          <div class="post-body">${esc(post.content)}</div>
+        </div>`;
+      
       html += renderAttachments(data.attachments, isOwner || isAdmin);
       html += renderHistory(data.history);
       html += await renderCommentsHtml(postId);
@@ -532,7 +540,7 @@ const App = (() => {
     const isStaff   = ['superadmin','admin','staff'].includes(currentUser.role);
     const canUpload = isStaff || currentUser.role === 'partner';
     return `
-      <div class="attach-section">
+   <div class="attach-section section-card section-attach">
         <h4>첨부파일 (${attachments.length})</h4>
         <div class="attach-list" id="attachList">
           ${!attachments.length
@@ -626,7 +634,7 @@ const App = (() => {
       };
 
       return `
-        <div class="comment-section">
+        <div class="comment-section section-card section-comment">
           <h4>댓글 (${comments.filter(c => !c.is_deleted).length})</h4>
           <div class="comment-list" id="commentList">
             ${topLevel.length ? topLevel.map(c => renderComment(c)).join('') : '<div style="color:var(--muted);font-size:13px">댓글이 없습니다.</div>'}
@@ -1308,7 +1316,9 @@ async function loadBoardManageView() {
     toast('슈퍼관리자만 접근할 수 있습니다.', 'error');
     return;
   }
-  
+
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('sbBoardManageHome')?.classList.add('active');
   showView('board-manage');
   setBreadcrumb([{label: '게시판 삭제'}]);
   
