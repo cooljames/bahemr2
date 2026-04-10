@@ -1,126 +1,128 @@
-import { json } from '../index.js';
-import { signJWT, hashPassword, checkPassword } from '../utils/auth.js';
+/**
+ * bahEMR2 로그인 페이지 스크립트
+ */
 
-export async function handleAuth(request, env, path) {
-  const method = request.method;
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('loginForm');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('loginBtn');
+  const errorDiv = document.getElementById('loginError');
+  const pwToggle = document.getElementById('pwToggle');
 
-  // ── POST /api/auth/login ──────────────────────────────────────────
-  if (path === '/api/auth/login' && method === 'POST') {
+  // 비밀번호 표시/숨김 토글
+  if (pwToggle) {
+    pwToggle.addEventListener('click', () => {
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      
+      // 아이콘 변경 (선택사항)
+      const eyeIcon = document.getElementById('eyeIcon');
+      if (type === 'text') {
+        eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+      } else {
+        eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+      }
+    });
+  }
+
+  // 폼 제출 이벤트
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); // 기본 제출 방지 (중요!)
+    
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    // 간단한 유효성 검사
+    if (!email || !password) {
+      showError('이메일과 비밀번호를 모두 입력하세요.');
+      return;
+    }
+
+    // 이메일 형식 검증
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showError('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
+    // 로딩 상태 시작
+    setLoading(true);
+    hideError();
+
     try {
-      const { email, password } = await request.json();
-      if (!email || !password) return json({ error: '이메일과 비밀번호를 입력하세요.' }, 400);
-
-      let user;
-      try {
-        user = await env.DB.prepare(
-          `SELECT u.*, c.name as company_name
-           FROM users u
-           LEFT JOIN companies c ON c.id = u.company_id
-           WHERE u.email = ? AND u.is_active = 1`
-        ).bind(email.trim().toLowerCase()).first();
-      } catch (dbErr) {
-        return json({ error: 'DB 조회 에러: ' + dbErr.message }, 500);
-      }
-
-      if (!user) return json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401);
-
-      const ok = await checkPassword(password, user.password);
-      if (!ok) return json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401);
-
-      if (user.role === 'pending') {
-        return json({ error: '관리자 승인 대기 중입니다. 담당자에게 문의하세요.' }, 403);
-      }
-
-      let token;
-      try {
-        const secretKey = env.JWT_SECRET || 'my_temporary_secret_key_12345';
-        token = await signJWT({
-          sub:        user.id,
-          email:      user.email,
-          name:       user.name,
-          role:       user.role,
-          company_id: user.company_id,
-          exp:        Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7  // 7일
-        }, secretKey);
-      } catch (jwtErr) {
-        return json({ error: '토큰 발급 에러: ' + jwtErr.message }, 500);
-      }
-
-      return json({
-        token,
-        user: {
-          id:            user.id,
-          email:         user.email,
-          name:          user.name,
-          role:          user.role,
-          company_id:    user.company_id,
-          company_name:  user.company_name,
-          profile_image: user.profile_image || null  // ← 추가
-        }
+      // API 요청
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
       });
 
-    } catch (err) {
-      return json({ error: '서버 내부 에러(JSON 파싱 등): ' + err.message }, 500);
+      const data = await response.json();
+
+      if (!response.ok) {
+        // 에러 응답 처리
+        showError(data.error || '로그인에 실패했습니다.');
+        return;
+      }
+
+      // 성공 시 토큰과 사용자 정보 저장
+      if (data.token && data.user) {
+        localStorage.setItem('bahemr_token', data.token);
+        localStorage.setItem('bahemr_user', JSON.stringify(data.user));
+        
+        // 대시보드로 리다이렉트
+        window.location.href = '/dashboard.html';
+      } else {
+        showError('로그인 응답 형식이 올바르지 않습니다.');
+      }
+
+    } catch (error) {
+      console.error('로그인 에러:', error);
+      showError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  // 로딩 상태 관리
+  function setLoading(isLoading) {
+    const btnText = loginBtn.querySelector('.btn-text');
+    const btnSpinner = loginBtn.querySelector('.btn-spinner');
+    
+    if (isLoading) {
+      loginBtn.disabled = true;
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline-block';
+      emailInput.disabled = true;
+      passwordInput.disabled = true;
+    } else {
+      loginBtn.disabled = false;
+      btnText.style.display = 'inline';
+      btnSpinner.style.display = 'none';
+      emailInput.disabled = false;
+      passwordInput.disabled = false;
     }
   }
 
-  // ── POST /api/auth/signup ─────────────────────────────────────────
-  if (path === '/api/auth/signup' && method === 'POST') {
-    try {
-      const { email, password, name, company_id } = await request.json();
-      if (!email || !password || !name) return json({ error: '필수 항목을 모두 입력하세요.' }, 400);
-      if (password.length < 8) return json({ error: '비밀번호는 8자 이상이어야 합니다.' }, 400);
-
-      const exists = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
-        .bind(email.trim().toLowerCase()).first();
-      if (exists) return json({ error: '이미 사용 중인 이메일입니다.' }, 409);
-
-      const hashed = await hashPassword(password);
-      await env.DB.prepare(
-        `INSERT INTO users (email, password, name, role, company_id)
-         VALUES (?, ?, ?, 'pending', ?)`
-      ).bind(email.trim().toLowerCase(), hashed, name.trim(), company_id || null).run();
-
-      return json({ message: '회원가입이 완료되었습니다. 관리자 승인 후 이용 가능합니다.' }, 201);
-    } catch (err) {
-      return json({ error: '회원가입 처리 에러: ' + err.message }, 500);
-    }
+  // 에러 메시지 표시
+  function showError(message) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
   }
 
-  // ── GET /api/auth/me ──────────────────────────────────────────────
-  if (path === '/api/auth/me' && method === 'GET') {
-    try {
-      const { verifyJWT } = await import('../utils/auth.js');
-      const user = await verifyJWT(request, env);
-      if (!user) return json({ error: '인증이 필요합니다.' }, 401);
-
-      const dbUser = await env.DB.prepare(
-        `SELECT u.id, u.email, u.name, u.role, u.company_id, u.is_active,
-                u.profile_image,
-                c.name as company_name, c.type as company_type
-         FROM users u
-         LEFT JOIN companies c ON c.id = u.company_id
-         WHERE u.id = ?`
-      ).bind(user.sub).first();
-
-      if (!dbUser) return json({ error: '사용자를 찾을 수 없습니다.' }, 404);
-      return json({ user: dbUser });
-    } catch (err) {
-      return json({ error: '사용자 정보 조회 에러: ' + err.message }, 500);
-    }
+  // 에러 메시지 숨김
+  function hideError() {
+    errorDiv.textContent = '';
+    errorDiv.style.display = 'none';
   }
 
-  // ── GET /api/auth/companies-public ───────────────────────────────
-  if (path === '/api/auth/companies-public' && method === 'GET') {
-    try {
-      const rows = await env.DB.prepare(
-        `SELECT id, name, type FROM companies WHERE is_active = 1 ORDER BY name`
-      ).all();
-      return json({ companies: rows.results });
-    } catch (err) {
-      return json({ error: '관계사 목록 조회 에러: ' + err.message }, 500);
-    }
+  // 이미 로그인된 경우 대시보드로 이동
+  const token = localStorage.getItem('bahemr_token');
+  if (token) {
+    // 토큰 유효성 간단 체크 (만료 시간 등은 서버에서 체크)
+    window.location.href = '/dashboard.html';
   }
-
-  return json({ error: '존재하지 않는 인증 API입니다.' }, 404);
-}
+});
