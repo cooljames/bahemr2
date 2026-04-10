@@ -1,157 +1,291 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>bahEMR — 대시보드</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/css/dashboard.css" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>bahEMR 대시보드 목업</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;
+  --border:#30363d;--border2:#21262d;
+  --primary:#00c896;--primary-d:#009970;--primary-bg:rgba(0,200,150,.08);
+  --text:#e6edf3;--text2:#c9d1d9;--muted:#8b949e;
+  --error:#f85149;--warning:#d29922;--success:#3fb950;--info:#58a6ff;
+  --font:'Noto Sans KR',sans-serif;--mono:'DM Mono',monospace;
+  --radius:8px;
+}
+body{font-family:var(--font);font-size:14px;color:var(--text);background:var(--bg);line-height:1.6}
+a{color:inherit;text-decoration:none}
+
+/* ── 전체 레이아웃 ── */
+.wrap{display:flex;height:620px;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--border2)}
+
+/* ── 사이드바 ── */
+.sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border2);display:flex;flex-direction:column}
+.sb-header{display:flex;align-items:center;padding:0 16px;height:56px;border-bottom:1px solid var(--border2)}
+.sb-logo{display:flex;align-items:center;gap:8px;color:var(--text);font-size:15px}
+.sb-logo-icon{font-size:18px}
+.sb-logo-text{font-size:15px;font-weight:300;letter-spacing:.04em}
+.sb-logo-text strong{font-weight:700;color:var(--primary)}
+.sb-nav{flex:1;overflow-y:auto;padding:10px 0;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.sb-section{padding:2px 8px;margin-bottom:2px}
+.sb-label{display:block;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 8px 4px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--radius);color:var(--text2);font-size:13px;border:none;background:none;width:100%;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+.sb-item svg{width:15px;height:15px;flex-shrink:0;opacity:.7}
+.sb-item:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.sb-item.active{background:var(--primary-bg);color:var(--primary);font-weight:500}
+.sb-item.active svg{opacity:1}
+.sb-user{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--border2)}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#0d1117;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-user-name{font-size:13px;font-weight:500;display:block}
+.sb-user-role{font-size:11px;color:var(--muted);font-family:var(--mono);display:block}
+.sb-logout{background:none;border:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:6px;margin-left:auto;display:flex}
+.sb-logout svg{width:14px;height:14px}
+.sb-logout:hover{color:var(--error)}
+
+/* ── 메인 영역 ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.topbar{height:56px;background:rgba(13,17,23,.95);border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.breadcrumb a{color:var(--muted)}
+.company-badge{font-size:11px;font-family:var(--mono);background:var(--primary-bg);color:var(--primary);border:1px solid rgba(0,200,150,.25);border-radius:20px;padding:3px 10px}
+.content{flex:1;overflow-y:auto;padding:20px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
+.page-header h1{font-size:21px;font-weight:600;letter-spacing:-.02em}
+.page-header p{font-size:13px;color:var(--muted);margin-top:3px}
+
+/* ── 통계 카드 ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:16px;display:flex;align-items:center;gap:12px;transition:border-color .2s}
+.stat-card:hover{border-color:var(--border)}
+.stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-icon svg{width:18px;height:18px}
+.si-blue{background:rgba(88,166,255,.12);color:var(--info)}
+.si-green{background:rgba(63,185,80,.12);color:var(--success)}
+.si-purple{background:rgba(188,140,255,.12);color:#bc8cff}
+.si-orange{background:rgba(210,153,34,.12);color:var(--warning)}
+.stat-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:block}
+.stat-val{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--text);line-height:1.2;display:block}
+
+/* ── 접수 현황 ── */
+.status-panel{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:18px}
+.status-panel h3{font-size:13px;font-weight:600;margin-bottom:14px}
+.status-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.status-row:last-child{margin-bottom:0}
+.s-label{width:64px;font-size:12px;color:var(--muted);text-align:right}
+.s-bar-bg{flex:1;height:7px;background:var(--border2);border-radius:4px;overflow:hidden}
+.s-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.s-submitted{background:var(--info)}
+.s-reviewing{background:var(--warning)}
+.s-accepted{background:var(--success)}
+.s-rejected{background:var(--error)}
+.s-count{width:28px;font-size:12px;font-family:var(--mono);color:var(--text2);text-align:right}
+
+/* ── 최근 게시글 ── */
+.recent-panel{background:var(--surface);border:1px solid var(--border2);border-radius:10px;overflow:hidden}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border2)}
+.panel-header h3{font-size:13px;font-weight:600}
+.recent-row{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .15s;font-size:13px}
+.recent-row:last-child{border-bottom:none}
+.recent-row:hover{background:rgba(255,255,255,.025)}
+.rb{font-size:11px;font-family:var(--mono);color:var(--muted);background:var(--border2);border-radius:4px;padding:2px 7px;white-space:nowrap}
+.rt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm{font-size:12px;color:var(--muted);white-space:nowrap}
+
+/* ── 배지 ── */
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.bs{background:rgba(88,166,255,.12);color:var(--info)}
+.ba{background:rgba(63,185,80,.12);color:var(--success)}
+.bw{background:rgba(210,153,34,.12);color:var(--warning)}
+</style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════
-     사이드바.
-═══════════════════════════════════════════════ -->
-<aside class="sidebar" id="sidebar">
-  <div class="sb-header">
-    <a href="/dashboard.html" class="sb-logo" id="homeLogoLink">
-      <span class="sb-logo-icon">⚕</span>
-      <span class="sb-logo-text">bah<strong>EMR</strong></span>
-    </a>
-    <button class="sb-close" id="sbClose">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-  </div>
+<div class="wrap">
 
-  <nav class="sb-nav">
-    <!-- 홈 -->
-    <div class="sb-section">
-      <a href="/dashboard.html" class="sb-item sb-item--home" id="navHome" data-view="home">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
-        <span>대시보드 홈</span>
+  <!-- ══ 사이드바 ══ -->
+  <aside class="sidebar">
+    <div class="sb-header">
+      <a class="sb-logo">
+        <span class="sb-logo-icon">⚕</span>
+        <span class="sb-logo-text">bah<strong>EMR</strong></span>
       </a>
     </div>
 
-    <!-- 게시판 목록 -->
-    <div class="sb-section">
-      <span class="sb-label">게시판</span>
-      <div id="sbBoardList">
-        <div class="sb-skeleton"></div>
-        <div class="sb-skeleton"></div>
-        <div class="sb-skeleton"></div>
+    <nav class="sb-nav">
+      <!-- 홈 -->
+      <div class="sb-section">
+        <a class="sb-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9,22 9,12 15,12 15,22"/>
+          </svg>
+          대시보드 홈
+        </a>
       </div>
-      <!-- 슈퍼관리자 전용 -->
-      <button class="sb-item sb-item--add" id="sbCreateBoard" style="display:none" onclick="App.openCreateBoardModal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        <span>게시판 생성</span>
+
+      <!-- 게시판 -->
+      <div class="sb-section">
+        <span class="sb-label">게시판</span>
+        <a class="sb-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 8a.76.76 0 0 0 0-.21v-.08a.77.77 0 0 0-.07-.16.35.35 0 0 0-.05-.08l-.1-.13-.08-.06-.12-.09-9-5a1 1 0 0 0-1 0l-9 5-.09.07-.11.08a.41.41 0 0 0-.07.11.39.39 0 0 0-.08.1.59.59 0 0 0-.06.14.3.3 0 0 0 0 .1A.76.76 0 0 0 2 8v8a1 1 0 0 0 .52.87l9 5a.75.75 0 0 0 .13.06l.1.05a1 1 0 0 0 .5 0l.1-.05.14-.06 9-5A1 1 0 0 0 22 16z"/>
+          </svg>
+          공지사항
+          <span style="margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--muted)">12</span>
+        </a>
+        <a class="sb-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+          </svg>
+          접수게시판
+          <span style="margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--muted)">87</span>
+        </a>
+        <a class="sb-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          자유게시판
+          <span style="margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--muted)">88</span>
+        </a>
+      </div>
+
+      <!-- 관리 -->
+      <div class="sb-section">
+        <span class="sb-label">관리</span>
+        <a class="sb-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          사용자 관리
+        </a>
+        <a class="sb-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          </svg>
+          관계사 관리
+        </a>
+      </div>
+    </nav>
+
+    <!-- 사용자 정보 -->
+    <div class="sb-user">
+      <div class="sb-avatar">관</div>
+      <div>
+        <span class="sb-user-name">관리자</span>
+        <span class="sb-user-role">superadmin</span>
+      </div>
+      <button class="sb-logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16,17 21,12 16,7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
       </button>
     </div>
+  </aside>
 
-    <!-- 관리 메뉴 (admin 이상) -->
-    <div class="sb-section" id="sbAdminSection" style="display:none">
-      <span class="sb-label">관리</span>
-      <a href="#" class="sb-item" data-view="users">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span>사용자 관리</span>
-      </a>
-      <a href="#" class="sb-item" data-view="companies" id="sbCompanies">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        <span>관계사 관리</span>
-      </a>
+  <!-- ══ 메인 ══ -->
+  <div class="main">
+
+    <!-- 상단 헤더 -->
+    <div class="topbar">
+      <div class="breadcrumb">
+        <a>홈</a>
+      </div>
+      <span class="company-badge">bahEMR 클리닉</span>
     </div>
-  </nav>
 
-  <!-- 사용자 정보 -->
-  <div class="sb-user" id="sbUser">
-    <div class="sb-user-avatar" id="sbAvatar" onclick="App.openProfileModal()" title="프로필 수정">?</div>
-    <div class="sb-user-info" onclick="App.openProfileModal()" style="cursor:pointer" title="프로필 수정">
-      <span class="sb-user-name" id="sbName">-</span>
-      <span class="sb-user-role" id="sbRole">-</span>
-    </div>
-    <button class="sb-logout" id="sbLogout" title="로그아웃">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-    </button>
-  </div>
-</aside>
+    <!-- 콘텐츠 -->
+    <div class="content">
 
-<!-- 모바일 오버레이 -->
-<div class="sb-overlay" id="sbOverlay"></div>
-
-<!-- ═══════════════════════════════════════════════
-     메인
-═══════════════════════════════════════════════ -->
-<div class="main-wrap">
-  <!-- 상단 헤더 -->
-  <header class="top-bar">
-    <div class="top-bar-left">
-      <button class="hamburger" id="hamburger">
-        <span></span><span></span><span></span>
-      </button>
-      <nav class="breadcrumb" id="breadcrumb">
-        <a href="/dashboard.html">홈</a>
-      </nav>
-    </div>
-    <div class="top-bar-right">
-      <span class="company-badge" id="companyBadge" style="display:none"></span>
-    </div>
-  </header>
-
-  <!-- 콘텐츠 -->
-  <div class="content-area" id="contentArea">
-
-    <!-- ── 대시보드 홈 ── -->
-    <div class="view" id="view-home">
+      <!-- 페이지 헤더 -->
       <div class="page-header">
         <div>
           <h1>대시보드</h1>
-          <p id="welcomeMsg">환영합니다.</p>
+          <p>관리자님, 환영합니다.</p>
         </div>
       </div>
 
+      <!-- 통계 카드 4개 -->
       <div class="stat-grid">
-        <div class="stat-card" id="statCard1" style="display:none">
+        <div class="stat-card">
           <div class="stat-icon si-blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            </svg>
           </div>
-          <div class="stat-body">
+          <div>
             <span class="stat-label">전체 사용자</span>
-            <span class="stat-val" id="statUsers">-</span>
+            <span class="stat-val">24</span>
           </div>
         </div>
-        <div class="stat-card" id="statCard2" style="display:none">
+        <div class="stat-card">
           <div class="stat-icon si-green">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14,2 14,8 20,8"/>
+            </svg>
           </div>
-          <div class="stat-body">
+          <div>
             <span class="stat-label">게시판 수</span>
-            <span class="stat-val" id="statBoards">-</span>
+            <span class="stat-val">3</span>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-icon si-purple">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
           </div>
-          <div class="stat-body">
+          <div>
             <span class="stat-label">전체 게시글</span>
-            <span class="stat-val" id="statPosts">-</span>
+            <span class="stat-val">187</span>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-icon si-orange">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
           </div>
-          <div class="stat-body">
+          <div>
             <span class="stat-label">접수 대기</span>
-            <span class="stat-val" id="statPending">-</span>
+            <span class="stat-val">5</span>
           </div>
         </div>
       </div>
 
-      <!-- 접수 상태 현황 -->
-      <div class="status-panel" id="statusPanel" style="display:none">
+      <!-- 접수 현황 바 -->
+      <div class="status-panel">
         <h3>접수 현황</h3>
-        <div class="status-bars" id="statusBars"></div>
+        <div class="status-row">
+          <span class="s-label">제출</span>
+          <div class="s-bar-bg"><div class="s-bar-fill s-submitted" style="width:28%"></div></div>
+          <span class="s-count">14</span>
+        </div>
+        <div class="status-row">
+          <span class="s-label">검토중</span>
+          <div class="s-bar-bg"><div class="s-bar-fill s-reviewing" style="width:18%"></div></div>
+          <span class="s-count">9</span>
+        </div>
+        <div class="status-row">
+          <span class="s-label">접수완료</span>
+          <div class="s-bar-bg"><div class="s-bar-fill s-accepted" style="width:50%"></div></div>
+          <span class="s-count">25</span>
+        </div>
+        <div class="status-row">
+          <span class="s-label">반려</span>
+          <div class="s-bar-bg"><div class="s-bar-fill s-rejected" style="width:8%"></div></div>
+          <span class="s-count">4</span>
+        </div>
       </div>
 
       <!-- 최근 게시글 -->
@@ -159,299 +293,39 @@
         <div class="panel-header">
           <h3>최근 게시글</h3>
         </div>
-        <div id="recentList" class="recent-list">
-          <div class="loading-row">불러오는 중...</div>
+        <div class="recent-row">
+          <span class="rb">접수게시판</span>
+          <span class="rt">해운 에이전트 신규 접수 건 — 홍길동</span>
+          <span class="badge bw">검토중</span>
+          <span class="rm">2026.04.10</span>
+        </div>
+        <div class="recent-row">
+          <span class="rb">공지사항</span>
+          <span class="rt">2026년 2분기 검진 일정 안내</span>
+          <span class="rm">2026.04.09</span>
+        </div>
+        <div class="recent-row">
+          <span class="rb">접수게시판</span>
+          <span class="rt">요양원 방문 의료 서비스 신청</span>
+          <span class="badge ba">접수완료</span>
+          <span class="rm">2026.04.09</span>
+        </div>
+        <div class="recent-row">
+          <span class="rb">접수게시판</span>
+          <span class="rt">외국인 대상 건강검진 예약 문의</span>
+          <span class="badge bs">제출</span>
+          <span class="rm">2026.04.08</span>
+        </div>
+        <div class="recent-row">
+          <span class="rb">공지사항</span>
+          <span class="rt">시스템 점검 안내 (4/12 02:00~04:00)</span>
+          <span class="rm">2026.04.07</span>
         </div>
       </div>
-    </div>
 
-    <!-- ── 게시판 목록 뷰 ── -->
-    <div class="view" id="view-board" style="display:none">
-      <div class="page-header">
-        <div>
-          <h1 id="boardTitle">게시판</h1>
-          <p id="boardDesc"></p>
-        </div>
-        <div class="page-actions">
-          <button class="btn-secondary" id="btnExport" style="display:none" onclick="App.exportCSV()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            CSV 내보내기
-          </button>
-          <button class="btn-primary" id="btnWrite" onclick="App.openWriteView()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            글쓰기
-          </button>
-        </div>
-      </div>
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /wrap -->
 
-      <!-- 검색/필터 -->
-      <div class="filter-bar">
-        <input type="text" id="searchInput" placeholder="제목 또는 내용 검색..." class="search-input" />
-        <select id="statusFilter" class="filter-select" style="display:none">
-          <option value="">전체 상태</option>
-          <option value="submitted">제출</option>
-          <option value="reviewing">검토중</option>
-          <option value="accepted">접수완료</option>
-          <option value="rejected">반려</option>
-        </select>
-        <button class="btn-ghost" onclick="App.loadPosts()">검색</button>
-      </div>
-
-      <!-- 게시글 목록 테이블 -->
-      <div class="table-wrap">
-        <table class="post-table">
-          <thead>
-            <tr>
-              <th class="col-num">번호</th>
-              <th class="col-title">제목</th>
-              <th class="col-status" id="thStatus" style="display:none">상태</th>
-              <th class="col-author">작성자</th>
-              <th class="col-company" id="thCompany" style="display:none">관계사</th>
-              <th class="col-date">날짜</th>
-            </tr>
-          </thead>
-          <tbody id="postTableBody">
-            <tr><td colspan="6" class="empty-td">게시글을 불러오는 중...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- 페이지네이션 -->
-      <div class="pagination" id="pagination"></div>
-    </div>
-
-    <!-- ── 게시글 상세 뷰 ── -->
-    <div class="view" id="view-post" style="display:none">
-      <div class="post-detail" id="postDetail"></div>
-    </div>
-
-    <!-- ── 글쓰기/수정 뷰 ── -->
-    <div class="view" id="view-write" style="display:none">
-      <div class="write-wrap" id="writeWrap"></div>
-    </div>
-
-    <!-- ── 사용자 관리 뷰 ── -->
-    <div class="view" id="view-users" style="display:none">
-      <div class="page-header">
-        <h1>사용자 관리</h1>
-      </div>
-      <div id="userManageContent"></div>
-    </div>
-
-    <!-- ── 관계사 관리 뷰 ── -->
-    <div class="view" id="view-companies" style="display:none">
-      <div class="page-header">
-        <div><h1>관계사 관리</h1></div>
-        <button class="btn-primary" id="btnAddCompany" onclick="App.openCompanyModal()">+ 관계사 추가</button>
-      </div>
-      <div id="companyListContent"></div>
-    </div>
-
-  </div><!-- /content-area -->
-</div><!-- /main-wrap -->
-
-<!-- ═══════════════════════════════════════════════
-     모달들
-═══════════════════════════════════════════════ -->
-
-<!-- 게시판 생성 모달 -->
-<div class="modal-backdrop" id="modalCreateBoard" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>게시판 생성</h2>
-      <button class="modal-x" onclick="App.closeCreateBoardModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="mf-group">
-        <label>게시판 이름 <span class="req">*</span></label>
-        <input type="text" id="mbName" placeholder="예: 공지사항, 접수게시판" maxlength="50" />
-      </div>
-      <div class="mf-group">
-        <label>설명</label>
-        <textarea id="mbDesc" rows="2" placeholder="게시판 용도 설명"></textarea>
-      </div>
-      <div class="mf-row">
-        <div class="mf-group">
-          <label>게시판 유형</label>
-          <select id="mbType">
-            <option value="general">일반</option>
-            <option value="notice">공지사항</option>
-            <option value="reception">접수게시판</option>
-          </select>
-        </div>
-        <div class="mf-group">
-          <label>정렬 순서</label>
-          <input type="number" id="mbOrder" value="0" min="0" />
-        </div>
-      </div>
-      <div class="mf-row">
-        <div class="mf-group">
-          <label>읽기 권한</label>
-          <select id="mbAccess">
-            <option value="all">전체 (모든 로그인 사용자)</option>
-            <option value="staff">내부 직원 이상</option>
-            <option value="admin">관리자 이상</option>
-          </select>
-        </div>
-        <div class="mf-group">
-          <label>쓰기 권한</label>
-          <select id="mbWrite">
-            <option value="all">전체</option>
-            <option value="staff">내부 직원 이상</option>
-            <option value="admin">관리자 이상</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="App.closeCreateBoardModal()">취소</button>
-      <button class="btn-primary" onclick="App.submitCreateBoard()">생성</button>
-    </div>
-  </div>
-</div>
-
-<!-- 관계사 모달 -->
-<div class="modal-backdrop" id="modalCompany" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="companyModalTitle">관계사 추가</h2>
-      <button class="modal-x" onclick="App.closeCompanyModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="mf-group">
-        <label>관계사명 <span class="req">*</span></label>
-        <input type="text" id="cmName" placeholder="관계사 이름" maxlength="100" />
-      </div>
-      <div class="mf-group">
-        <label>유형</label>
-        <select id="cmType">
-          <option value="nursing_home">요양원/복지관</option>
-          <option value="clinic">검진센터/클리닉</option>
-          <option value="insurance">보험사/행정기관</option>
-          <option value="corporate">기업 복지팀</option>
-          <option value="shipping">선사/해운사</option>
-          <option value="agency">해운 에이전트</option>
-          <option value="foreign">외국인 대상 기관</option>
-          <option value="other">기타</option>
-        </select>
-      </div>
-      <div class="mf-group">
-        <label>연락처</label>
-        <input type="text" id="cmContact" placeholder="전화번호 또는 이메일" />
-      </div>
-      <div class="mf-group">
-        <label>메모</label>
-        <textarea id="cmMemo" rows="2" placeholder="기타 메모"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="App.closeCompanyModal()">취소</button>
-      <button class="btn-primary" onclick="App.submitCompany()">저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- 프로필 편집 모달 -->
-<div class="modal-backdrop" id="modalProfile" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>프로필 수정</h2>
-      <button class="modal-x" onclick="App.closeProfileModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <!-- 프로필 이미지 -->
-      <div class="mf-group">
-        <label>프로필 이미지</label>
-        <div class="profile-image-section">
-          <div class="profile-image-preview" id="profileImagePreview" onclick="App.toggleProfileImageUpload()">
-            <img id="profileImageDisplay" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;" alt="프로필 이미지" />
-            <div class="profile-image-placeholder" id="profileImagePlaceholder">?</div>
-            <div class="profile-image-overlay">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
-              <span>클릭하여 변경</span>
-            </div>
-          </div>
-          <div class="profile-image-controls">
-            <input type="file" id="profileImageInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="App.handleProfileImageChange()" />
-            <button type="button" class="btn-secondary btn-sm" onclick="document.getElementById('profileImageInput').click()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:4px">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              이미지 선택
-            </button>
-            <button type="button" class="btn-ghost btn-sm" id="btnRemoveProfileImage" onclick="App.removeProfileImage()" style="display:none">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:4px">
-                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-              </svg>
-              삭제
-            </button>
-          </div>
-          <p class="profile-image-hint">2MB 이하 JPG, PNG, GIF, WebP</p>
-        </div>
-      </div>
-      
-      <!-- 기본 정보 -->
-      <div class="mf-group">
-        <label>이메일 (아이디)</label>
-        <input type="text" id="profileEmail" disabled style="background:#f5f5f5; color:#8b949e" />
-      </div>
-      <div class="mf-group">
-        <label>이름 <span class="req">*</span></label>
-        <input type="text" id="profileName" placeholder="이름을 입력하세요" maxlength="50" />
-      </div>
-      
-      <!-- 비밀번호 변경 섹션 -->
-      <div class="profile-divider"></div>
-      <div class="profile-section-header">
-        <h3>비밀번호 변경</h3>
-        <p>변경하지 않으려면 아래 필드를 비워두세요</p>
-      </div>
-      
-      <div class="mf-group">
-        <label>새 비밀번호 (최소 8자)</label>
-        <div class="pw-wrap">
-          <input type="password" id="profilePassword" placeholder="새 비밀번호 (8자 이상)" autocomplete="new-password" minlength="8" />
-          <button type="button" class="pw-toggle" onclick="App.togglePasswordVisibility('profilePassword', this)" aria-label="비밀번호 표시">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
-        </div>
-        <div class="password-strength" id="passwordStrength" style="display:none">
-          <div class="strength-bar">
-            <div class="strength-fill" id="strengthFill"></div>
-          </div>
-          <span class="strength-text" id="strengthText"></span>
-        </div>
-      </div>
-      
-      <div class="mf-group">
-        <label>비밀번호 확인</label>
-        <div class="pw-wrap">
-          <input type="password" id="profilePasswordConfirm" placeholder="비밀번호 확인" autocomplete="new-password" minlength="8" />
-          <button type="button" class="pw-toggle" onclick="App.togglePasswordVisibility('profilePasswordConfirm', this)" aria-label="비밀번호 표시">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
-        </div>
-        <div class="password-match" id="passwordMatch" style="display:none"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn-ghost" onclick="App.closeProfileModal()">취소</button>
-      <button type="button" class="btn-primary" onclick="App.submitProfile()">저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- 토스트 알림 -->
-<div class="toast-container" id="toastContainer"></div>
-
-<script src="/js/api.js"></script>
-<script src="/js/dashboard.js"></script>
 </body>
 </html>
