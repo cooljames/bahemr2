@@ -1,212 +1,183 @@
-
 import { json } from '../index.js';
-import { isAdmin } from '../utils/auth.js';
+import { isSuperAdmin, isAdmin, hashPassword } from '../utils/auth.js';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_TYPES = [
-  'image/jpeg','image/png','image/gif','image/webp',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain','text/csv'
-];
-
-export async function handleAttachments(request, env, user, path) {
+export async function handleUsers(request, env, user, path) {
   const method = request.method;
   const url    = new URL(request.url);
 
-  // ── POST /api/attachments/upload?post_id= 또는 ?comment_id= ──────
-  if (path === '/api/attachments/upload' && method === 'POST') {
-    const post_id    = url.searchParams.get('post_id');
-    const comment_id = url.searchParams.get('comment_id');
+  // GET /api/users — 사용자 목록 (admin 이상)
+  if (path === '/api/users' && method === 'GET') {
+    if (!isAdmin(user)) return json({ error: '권한이 없습니다.' }, 403);
 
-    if (!post_id && !comment_id) {
-      return json({ error: 'post_id 또는 comment_id가 필요합니다.' }, 400);
-    }
+    const role       = url.searchParams.get('role') || '';
+    const company_id = url.searchParams.get('company_id') || '';
+    const keyword    = url.searchParams.get('q') || '';
+    const page       = parseInt(url.searchParams.get('page') || '1');
+    const limit      = 20;
+    const offset     = (page - 1) * limit;
 
-    // 게시글/댓글 소유권 확인
-    if (post_id) {
-      const post = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(post_id).first();
-      if (!post) return json({ error: '게시글을 찾을 수 없습니다.' }, 404);
-      if (post.author_id !== user.sub && !isAdmin(user)) {
-        return json({ error: '권한이 없습니다.' }, 403);
-      }
-    }
+    let where = ['1=1'];
+    let binds = [];
+    if (role)       { where.push('u.role = ?');         binds.push(role); }
+    if (company_id) { where.push('u.company_id = ?');   binds.push(company_id); }
+    if (keyword)    { where.push('(u.name LIKE ? OR u.email LIKE ?)'); binds.push(`%${keyword}%`, `%${keyword}%`); }
 
-    if (comment_id) {
-      const comment = await env.DB.prepare('SELECT * FROM comments WHERE id = ?').bind(comment_id).first();
-      if (!comment) return json({ error: '댓글을 찾을 수 없습니다.' }, 404);
-      if (comment.author_id !== user.sub && !isAdmin(user)) {
-        return json({ error: '권한이 없습니다.' }, 403);
-      }
-    }
+    const whereStr = where.join(' AND ');
+    const rows = await env.DB.prepare(
+      `SELECT u.id, u.email, u.name, u.role, u.company_id, u.is_active, u.created_at,
+              c.name as company_name
+       FROM users u
+       LEFT JOIN companies c ON c.id = u.company_id
+       WHERE ${whereStr}
+       ORDER BY u.created_at DESC LIMIT ? OFFSET ?`
+    ).bind(...binds, limit, offset).all();
 
-    let formData;
-    try {
-      formData = await request.formData();
-    } catch (e) {
-      return json({ error: '파일 데이터를 읽을 수 없습니다: ' + e.message }, 400);
-    }
+    const countRow = await env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM users u WHERE ${whereStr}`
+    ).bind(...binds).first();
 
-    const file = formData.get('file');
-    if (!file) return json({ error: '파일을 선택하세요.' }, 400);
-
-    // 파일 크기/형식 검증
-    if (file.size > MAX_FILE_SIZE) {
-      return json({ error: '파일 크기는 5MB 이하여야 합니다.' }, 400);
-    }
-
-    const mimeType = file.type || 'application/octet-stream';
-    if (!ALLOWED_TYPES.includes(mimeType)) {
-      return json({ error: `허용되지 않는 파일 형식입니다. (${mimeType})` }, 400);
-    }
-
-    // 첨부파일 수 제한 (게시글당 10개)
-    if (post_id) {
-      const countRow = await env.DB.prepare(
-        'SELECT COUNT(*) as cnt FROM attachments WHERE post_id = ? AND comment_id IS NULL'
-      ).bind(post_id).first();
-      if (countRow.cnt >= 10) {
-        return json({ error: '첨부파일은 게시글당 최대 10개입니다.' }, 400);
-      }
-    }
-
-    // 파일 바이너리 → Base64 변환
-    let base64;
-    try {
-      const buffer = await file.arrayBuffer();
-      const bytes  = new Uint8Array(buffer);
-      let binary   = '';
-      const chunkSize = 8192;
-      for (let i = 0; i < bytes.byteLength; i += chunkSize) {
-        const chunk = bytes.subarray(i, i + chunkSize);
-        binary += String.fromCharCode(...chunk);
-      }
-      base64 = btoa(binary);
-    } catch (e) {
-      return json({ error: '파일 변환 중 오류가 발생했습니다: ' + e.message }, 500);
-    }
-
-    const ext       = (file.name.split('.').pop() || 'bin').toLowerCase();
-    const storedKey = `posts/${post_id || 'comment'}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-
-    try {
-      const result = await env.DB.prepare(
-        `INSERT INTO attachments (post_id, comment_id, uploader_id, filename, stored_key, file_size, mime_type, file_data)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        post_id    ? parseInt(post_id)    : null,
-        comment_id ? parseInt(comment_id) : null,
-        user.sub,
-        file.name,
-        storedKey,
-        file.size,
-        mimeType,
-        base64
-      ).run();
-
-      return json({
-        message: '파일이 업로드되었습니다.',
-        attachment: {
-          id:        result.meta.last_row_id,
-          filename:  file.name,
-          file_size: file.size,
-          mime_type: mimeType
-        }
-      }, 201);
-    } catch (e) {
-      return json({ error: 'DB 저장 오류: ' + e.message }, 500);
-    }
+    return json({ users: rows.results, total: countRow.cnt, page, limit });
   }
 
-  // ── GET /api/attachments/:id — 인라인 표시 (이미지 등) ───────────
-  const matchGet = path.match(/^\/api\/attachments\/(\d+)$/);
-  if (matchGet && method === 'GET') {
-    const attId = parseInt(matchGet[1]);
-    const att   = await env.DB.prepare(
-      `SELECT a.*, p.author_id as post_author_id, p.company_id
-       FROM attachments a
-       LEFT JOIN posts p ON p.id = a.post_id
-       WHERE a.id = ?`
-    ).bind(attId).first();
+  // GET /api/users/:id
+  const matchId = path.match(/^\/api\/users\/(\d+)$/);
+  if (matchId && method === 'GET') {
+    const targetId = parseInt(matchId[1]);
+    if (!isAdmin(user) && user.sub !== targetId) return json({ error: '권한이 없습니다.' }, 403);
 
-    if (!att) return json({ error: '파일을 찾을 수 없습니다.' }, 404);
+    const row = await env.DB.prepare(
+      `SELECT u.id, u.email, u.name, u.role, u.company_id, u.is_active, u.created_at,
+              c.name as company_name, c.type as company_type
+       FROM users u LEFT JOIN companies c ON c.id = u.company_id
+       WHERE u.id = ?`
+    ).bind(targetId).first();
 
-    // partner는 자기 회사 게시글 파일만
-    if (user.role === 'partner' && att.company_id !== user.company_id) {
-      return json({ error: '접근 권한이 없습니다.' }, 403);
-    }
-
-    try {
-      const binary = atob(att.file_data);
-      const bytes  = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-      return new Response(bytes.buffer, {
-        headers: {
-          'Content-Type':  att.mime_type,
-          'Cache-Control': 'private, max-age=3600'
-        }
-      });
-    } catch (e) {
-      return json({ error: '파일 읽기 오류: ' + e.message }, 500);
-    }
+    if (!row) return json({ error: '사용자를 찾을 수 없습니다.' }, 404);
+    return json({ user: row });
   }
 
-  // ── GET /api/attachments/:id/download ────────────────────────────
-  const matchDown = path.match(/^\/api\/attachments\/(\d+)\/download$/);
-  if (matchDown && method === 'GET') {
-    const attId = parseInt(matchDown[1]);
-    const att   = await env.DB.prepare(
-      `SELECT a.*, p.author_id, p.company_id
-       FROM attachments a
-       LEFT JOIN posts p ON p.id = a.post_id
-       WHERE a.id = ?`
-    ).bind(attId).first();
+  // PATCH /api/users/:id — 역할/상태 변경 (superadmin 전용)
+  const matchPatch = path.match(/^\/api\/users\/(\d+)$/);
+  if (matchPatch && method === 'PATCH') {
+    if (!isSuperAdmin(user)) return json({ error: '슈퍼관리자만 변경 가능합니다.' }, 403);
 
-    if (!att) return json({ error: '파일을 찾을 수 없습니다.' }, 404);
+    const targetId = parseInt(matchPatch[1]);
+    const body     = await request.json();
+    const { role, is_active, company_id, name } = body;
 
-    if (user.role === 'partner' && att.company_id !== user.company_id) {
-      return json({ error: '접근 권한이 없습니다.' }, 403);
-    }
+    const fields = [];
+    const binds  = [];
+    if (role       !== undefined) { fields.push('role = ?');       binds.push(role); }
+    if (is_active  !== undefined) { fields.push('is_active = ?');  binds.push(is_active); }
+    if (company_id !== undefined) { fields.push('company_id = ?'); binds.push(company_id); }
+    if (name       !== undefined) { fields.push('name = ?');       binds.push(name); }
+    if (!fields.length) return json({ error: '변경할 항목이 없습니다.' }, 400);
 
-    try {
-      const binary = atob(att.file_data);
-      const bytes  = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    fields.push('updated_at = datetime(\'now\')');
+    binds.push(targetId);
 
-      const encoded = encodeURIComponent(att.filename);
-      return new Response(bytes.buffer, {
-        headers: {
-          'Content-Type':        att.mime_type,
-          'Content-Disposition': `attachment; filename*=UTF-8''${encoded}`,
-          'Content-Length':      String(att.file_size)
-        }
-      });
-    } catch (e) {
-      return json({ error: '파일 다운로드 오류: ' + e.message }, 500);
-    }
+    await env.DB.prepare(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = ?`
+    ).bind(...binds).run();
+
+    return json({ message: '사용자 정보가 수정되었습니다.' });
   }
 
-  // ── DELETE /api/attachments/:id ───────────────────────────────────
-  const matchDel = path.match(/^\/api\/attachments\/(\d+)$/);
+  // PATCH /api/users/profile — 본인 프로필 업데이트
+  if (path === '/api/users/profile' && method === 'PATCH') {
+    const body = await request.json();
+    const { name, email, password, profile_image } = body;
+
+    const fields = [];
+    const binds = [];
+
+    if (name !== undefined) {
+      if (!name.trim()) return json({ error: '이름을 입력하세요.' }, 400);
+      fields.push('name = ?');
+      binds.push(name.trim());
+    }
+
+    if (email !== undefined) {
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return json({ error: '올바른 이메일 형식이 아닙니다.' }, 400);
+      }
+      fields.push('email = ?');
+      binds.push(email || null);
+    }
+
+    if (password !== undefined && password) {
+      if (password.length < 8) {
+        return json({ error: '비밀번호는 최소 8자 이상이어야 합니다.' }, 400);
+      }
+      const hashed = await hashPassword(password);
+      fields.push('password = ?');
+      binds.push(hashed);
+    }
+
+    if (profile_image !== undefined) {
+      // 빈 문자열이면 이미지 삭제, null이 아니면 업데이트
+      fields.push('profile_image = ?');
+      binds.push(profile_image || null);
+    }
+
+    if (!fields.length) {
+      return json({ error: '변경할 항목이 없습니다.' }, 400);
+    }
+
+    fields.push('updated_at = datetime(\'now\')');
+    binds.push(user.sub);
+
+    await env.DB.prepare(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = ?`
+    ).bind(...binds).run();
+
+    // 업데이트된 사용자 정보 반환
+    const updatedUser = await env.DB.prepare(
+      `SELECT u.id, u.username, u.email, u.name, u.role, u.company_id, u.profile_image,
+              c.name as company_name
+       FROM users u
+       LEFT JOIN companies c ON c.id = u.company_id
+       WHERE u.id = ?`
+    ).bind(user.sub).first();
+
+    return json({ message: '프로필이 업데이트되었습니다.', user: updatedUser });
+  }
+
+  // PATCH /api/users/:id/password — 비밀번호 변경
+  const matchPw = path.match(/^\/api\/users\/(\d+)\/password$/);
+  if (matchPw && method === 'PATCH') {
+    const targetId = parseInt(matchPw[1]);
+    if (!isSuperAdmin(user) && user.sub !== targetId) return json({ error: '권한이 없습니다.' }, 403);
+
+    const { current_password, new_password } = await request.json();
+    if (!new_password || new_password.length < 8) return json({ error: '새 비밀번호는 8자 이상이어야 합니다.' }, 400);
+
+    // 본인 변경 시 현재 비밀번호 확인
+    if (user.sub === targetId && !isSuperAdmin(user)) {
+      const { checkPassword } = await import('../utils/auth.js');
+      const row = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(targetId).first();
+      if (!await checkPassword(current_password, row.password)) {
+        return json({ error: '현재 비밀번호가 올바르지 않습니다.' }, 400);
+      }
+    }
+
+    const hashed = await hashPassword(new_password);
+    await env.DB.prepare('UPDATE users SET password = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .bind(hashed, targetId).run();
+
+    return json({ message: '비밀번호가 변경되었습니다.' });
+  }
+
+  // DELETE /api/users/:id — 계정 삭제 (superadmin)
+  const matchDel = path.match(/^\/api\/users\/(\d+)$/);
   if (matchDel && method === 'DELETE') {
-    const attId = parseInt(matchDel[1]);
-    const att   = await env.DB.prepare(
-      `SELECT a.*, p.author_id FROM attachments a
-       LEFT JOIN posts p ON p.id = a.post_id WHERE a.id = ?`
-    ).bind(attId).first();
+    if (!isSuperAdmin(user)) return json({ error: '슈퍼관리자만 삭제 가능합니다.' }, 403);
+    const targetId = parseInt(matchDel[1]);
+    if (targetId === user.sub) return json({ error: '자신의 계정은 삭제할 수 없습니다.' }, 400);
 
-    if (!att) return json({ error: '파일을 찾을 수 없습니다.' }, 404);
-    if (att.uploader_id !== user.sub && !isAdmin(user)) {
-      return json({ error: '삭제 권한이 없습니다.' }, 403);
-    }
-
-    await env.DB.prepare('DELETE FROM attachments WHERE id = ?').bind(attId).run();
-    return json({ message: '파일이 삭제되었습니다.' });
+    await env.DB.prepare('UPDATE users SET is_active = 0 WHERE id = ?').bind(targetId).run();
+    return json({ message: '계정이 비활성화되었습니다.' });
   }
 
-  return json({ error: '존재하지 않는 첨부파일 API입니다.' }, 404);
+  return json({ error: '존재하지 않는 사용자 API입니다.' }, 404);
 }
