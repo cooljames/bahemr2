@@ -2,7 +2,7 @@ import { json } from '../index.js';
 import { isSuperAdmin, isAdmin, isStaff } from '../utils/auth.js';
 
 /**
- * 권한 체크 유틸리티: 유저 객체가 없어도 에러가 나지 않도록 처리.
+ * 권한 체크 유틸리티: 유저 객체가 없어도 에러가 나지 않도록 처리
  */
 function canAccess(board, user) {
   if (!user) return board.access_role === 'all';
@@ -82,10 +82,9 @@ export async function handleBoards(request, env, user, path) {
 
   // ID 기반 라우팅을 위한 매치 (GET / PATCH / DELETE 공용)
   const matchId = path.match(/^\/api\/boards\/(\d+)$/);
-  
-  if (matchId) {
-    const boardId = parseInt(matchId[1], 10);
+  const boardId = matchId ? parseInt(matchId[1]) : null;
 
+  if (boardId) {
     // --- 3. GET /api/boards/:id (단일 조회) ---
     if (method === 'GET') {
       const board = await env.DB.prepare('SELECT * FROM boards WHERE id = ? AND is_active = 1')
@@ -127,29 +126,14 @@ export async function handleBoards(request, env, user, path) {
 
     // --- 5. DELETE /api/boards/:id (삭제/비활성화) ---
     if (method === 'DELETE') {
-      if (!isSuperAdmin(user)) {
-        return json({ error: '슈퍼관리자만 삭제할 수 있습니다.' }, 403);
-      }
+      if (!isSuperAdmin(user)) return json({ error: '슈퍼관리자만 삭제할 수 있습니다.' }, 403);
+      
+      await env.DB.prepare('UPDATE boards SET is_active = 0 WHERE id = ?')
+        .bind(boardId)
+        .run();
 
-      try {
-        // 1. 게시판 존재 여부 확인
-        const board = await env.DB.prepare('SELECT id FROM boards WHERE id = ? AND is_active = 1').bind(boardId).first();
-        if (!board) {
-          return json({ error: '존재하지 않거나 이미 삭제된 게시판입니다.' }, 404);
-        }
-
-        // 2. 소프트 삭제 (is_active = 0) 처리
-        await env.DB.prepare('UPDATE boards SET is_active = 0 WHERE id = ?').bind(boardId).run();
-
-        return json({ message: '게시판이 성공적으로 삭제(비활성화) 되었습니다.' });
-      } catch (err) {
-        console.error('[Board Delete Error]', err);
-        return json({ error: '게시판 삭제 처리 중 서버 오류가 발생했습니다.' }, 500);
-      }
+      return json({ message: '게시판이 삭제되었습니다.' });
     }
-
-    // 일치하는 라우트가 없을 경우
-    return json({ error: '지원하지 않는 게시판 API 메서드입니다.' }, 405);
   }
 
   return json({ error: '존재하지 않는 게시판 API입니다.' }, 404);
