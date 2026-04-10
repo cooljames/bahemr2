@@ -8,7 +8,7 @@
  *  3. submitProfile()의 updateSidebar() → updateSidebarAvatar() 오타 수정
  *  4. Day/Night 토글 초기화를 init() 내부로 이동 (DOM 준비 전 실행 버그 수정)
  *  5. applyTheme()을 App IIFE 내부로 이동 및 Public API에 노출
- *  6. resizeImageToDataUri()를 IIFE 내부 헬퍼로 이동
+ *  6. resizeImageToDataUri()를 IIFE 내부 헬퍼로 이동.
  */
 const App = (() => {
   let currentUser      = null;
