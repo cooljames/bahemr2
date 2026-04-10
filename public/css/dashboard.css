@@ -421,6 +421,50 @@ input, select, textarea { font-family: var(--font); }
 .search-input::placeholder { color: var(--muted); }
 .filter-select { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 13px; padding: 8px 12px; outline: none; cursor: pointer; }
 .filter-select option { background: var(--surface); }
+/* ── Day/Night 스와이프 토글 ── */
+.swipe-toggle {
+  position: relative; width: 72px; height: 32px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 20px; cursor: pointer;
+  display: flex; align-items: center; padding: 3px;
+  overflow: hidden; transition: border-color .3s;
+}
+.swipe-thumb {
+  position: absolute; left: 3px;
+  width: 34px; height: 24px;
+  background: var(--primary); border-radius: 16px;
+  transition: transform .3s cubic-bezier(.4,0,.2,1), background .3s;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+}
+.swipe-thumb.is-day { transform: translateX(32px); background: #f5a623; }
+
+/* ── Day 모드 변수 오버라이드 ── */
+body.day-mode {
+  --bg: #f5f7fa; --surface: #ffffff; --surface2: #f0f2f5;
+  --border: #d0d7de; --border2: #e1e4e8;
+  --primary: #00a87a; --primary-d: #007a58;
+  --text: #1c2128; --text2: #24292f; --muted: #57606a;
+  --error: #cf222e; --warning: #9a6700;
+  --success: #1a7f37; --info: #0969da;
+}
+
+/* ── 반응형 게시판: 모바일에서 카드로 전환 ── */
+@media (max-width: 640px) {
+  .table-wrap { overflow-x: auto; }
+  .post-table { display: none; }
+  .post-card-grid {
+    display: grid; grid-template-columns: 1fr;
+    gap: 10px; padding: 12px;
+  }
+}
+.post-card-grid { display: none; }
+.post-card {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 14px 16px;
+  cursor: pointer; transition: border-color .15s;
+}
+.post-card:hover { border-color: var(--border); background: var(--surface2); }
 
 /* ════════════════════════════════
    게시글 테이블
