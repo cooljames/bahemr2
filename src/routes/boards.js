@@ -2,7 +2,7 @@ import { json } from '../index.js';
 import { isSuperAdmin, isAdmin, isStaff } from '../utils/auth.js';
 
 /**
- * 권한 체크 유틸리티: 유저 객체가 없어도 에러가 나지 않도록 처리
+ * 권한 체크 유틸리티: 유저 객체가 없어도 에러가 나지 않도록 처리.
  */
 function canAccess(board, user) {
   if (!user) return board.access_role === 'all';
