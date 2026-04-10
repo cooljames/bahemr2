@@ -418,9 +418,7 @@ const App = (() => {
       });
 
       let html = `
-        <div class="post-header section-card section-title">
-          <div class="section-chip section-chip-title">제목</div>
-          <div class="post-title">${esc(post.title)}</div>
+      <div class="post-header section-card section-title">
           <div class="post-meta-row">
             <span class="post-meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -480,12 +478,16 @@ const App = (() => {
 
       html += `<div class="post-read-form">`;
       html += `
+        <div class="form-group read-group">
+          <label>제목</label>
+          <input type="text" class="read-input" value="${esc(post.title)}" readonly />
+        </div>`;
+      html += `
         <div class="post-body-section form-group read-group">
           <label>본문</label>
           <div class="post-body">${esc(post.content)}</div>
         </div>`;
       html += renderAttachments(data.attachments, isOwner || isAdmin);
-      html += renderHistory(data.history);
       html += await renderCommentsHtml(postId);
       html += renderHistory(data.history);
       html += `</div>`;
@@ -512,6 +514,11 @@ const App = (() => {
     }
 
     document.getElementById('commentForm')?.addEventListener('submit', submitComment);
+    document.getElementById('commentPhotoBtn')?.addEventListener('click', () => {
+    document.getElementById('commentAttachments')?.click();
+    });
+    document.getElementById('commentInput')?.addEventListener('input', updateCommentCounter);
+    updateCommentCounter();
 
     const commentFileInput  = document.getElementById('commentAttachments');
     const commentPreviewDiv = document.getElementById('commentAttachmentPreview');
@@ -636,26 +643,31 @@ const App = (() => {
       };
 
       return `
+      
           <div class="comment-section form-group read-group">
           <label>댓글 (${comments.filter(c => !c.is_deleted).length})</label>
 
           <div class="comment-list" id="commentList">
             ${topLevel.length ? topLevel.map(c => renderComment(c)).join('') : '<div style="color:var(--muted);font-size:13px">댓글이 없습니다.</div>'}
           </div>
-          <form class="comment-form" id="commentForm">
+          <form class="comment-composer" id="commentForm">
+          
             <div id="replyIndicator" style="display:none;font-size:12px;color:var(--primary);margin-bottom:6px"></div>
             <input type="hidden" id="replyParentId" value="" />
-            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="3"></textarea>
-            <div class="comment-file-section" style="margin-top:8px;margin-bottom:8px">
-              <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">파일 첨부 (선택사항)</label>
-              <div class="comment-file-input">
-                <input type="file" id="commentAttachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="font-size:12px" />
+
+            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="4" maxlength="3000"></textarea>
+            <div class="comment-composer-meta"><span id="commentCount">0</span>/3000</div>
+            <div id="commentAttachmentPreview" class="attachment-preview" style="margin-top:8px"></div>
+            <div class="comment-composer-footer">
+              <div class="comment-tools">
+                <button type="button" class="comment-tool-btn" id="commentPhotoBtn">📷 사진</button>
+                <label class="comment-tool-btn"><input type="checkbox" id="commentPrivate" /> 비밀댓글</label>
+                <input type="file" id="commentAttachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display:none" />
               </div>
-              <div id="commentAttachmentPreview" class="attachment-preview" style="margin-top:8px"></div>
-            </div>
-            <div class="comment-form-footer">
-              <button type="button" class="btn-ghost btn-sm" id="cancelReplyBtn" style="display:none;margin-right:8px" onclick="App.cancelReply()">취소</button>
-              <button type="submit" class="btn-primary btn-sm">댓글 등록</button>
+              <div class="comment-submit-wrap">
+                <button type="button" class="btn-ghost btn-sm" id="cancelReplyBtn" style="display:none;margin-right:8px" onclick="App.cancelReply()">취소</button>
+                <button type="submit" class="btn-primary btn-sm">등록</button>
+              </div>              
             </div>
           </form>
         </div>`;
@@ -675,6 +687,13 @@ const App = (() => {
     document.getElementById('replyParentId').value          = '';
     document.getElementById('replyIndicator').style.display = 'none';
     document.getElementById('cancelReplyBtn').style.display = 'none';
+  }
+
+  function updateCommentCounter() {
+    const input = document.getElementById('commentInput');
+    const counter = document.getElementById('commentCount');
+    if (!input || !counter) return;
+    counter.textContent = input.value.length;
   }
 
   async function submitComment(e) {
