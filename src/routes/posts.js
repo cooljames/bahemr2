@@ -217,6 +217,24 @@ export async function handlePosts(request, env, user, path) {
           rd.exam_results ? JSON.stringify(rd.exam_results) : null,
           rd.vessel_name||null, rd.port_of_call||null, postId
         ).run();
+      } else {
+        await env.DB.prepare(
+          `INSERT INTO reception_data
+            (post_id, patient_name, patient_dob, patient_gender, patient_phone, patient_nationality,
+             id_type, id_number, chief_complaint, symptoms, exam_results, vessel_name, port_of_call)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        ).bind(
+          postId,
+          rd.patient_name||null, rd.patient_dob||null, rd.patient_gender||null,
+          rd.patient_phone||null, rd.patient_nationality||null,
+          rd.id_type||null, rd.id_number||null, rd.chief_complaint||null,
+          rd.symptoms||null,
+          rd.exam_results ? JSON.stringify(rd.exam_results) : null,
+          rd.vessel_name||null, rd.port_of_call||null
+        ).run();
+
+
+        
       }
     }
 
