@@ -132,18 +132,23 @@ const App = (() => {
   // ── 사이드바 아바타 업데이트 ──────────────────────────────────────
   function updateSidebarAvatar(user) {
     const avatarEl = document.getElementById('sbAvatar');
-    if (!avatarEl) return;
-    if (user.profile_image) {
-      avatarEl.innerHTML = `<img src="${user.profile_image}" alt="프로필" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
-      avatarEl.style.background = 'none';
-      avatarEl.style.padding    = '0';
-    } else {
-      avatarEl.innerHTML        = (user.name || '?').charAt(0).toUpperCase();
-      avatarEl.style.background = '';
-      avatarEl.style.padding    = '';
+
+    if (avatarEl) {
+      if (user.profile_image) {
+        avatarEl.innerHTML = `<img src="${user.profile_image}" alt="프로필" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+        avatarEl.style.background = 'none';
+        avatarEl.style.padding    = '0';
+      } else {
+        avatarEl.innerHTML        = (user.name || '?').charAt(0).toUpperCase();
+        avatarEl.style.background = '';
+        avatarEl.style.padding    = '';
+      }
+    
     }
-    document.getElementById('sbName').textContent = user.name;
-    document.getElementById('sbRole').textContent = ROLE_LABEL[user.role] || user.role;
+    const nameEl = document.getElementById('sbName');
+    const roleEl = document.getElementById('sbRole');
+    if (nameEl) nameEl.textContent = user.name;
+    if (roleEl) roleEl.textContent = ROLE_LABEL[user.role] || user.role;
   }
 
   // ── 초기화 ────────────────────────────────────────────────────────
@@ -154,7 +159,7 @@ const App = (() => {
 
     currentUser = user;
 
-    updateSidebarAvatar(user);
+    updateTopUserProfile(user);
     initTheme();
 
     document.getElementById('welcomeMsg').textContent = `${user.name}님, 환영합니다.`;
@@ -172,8 +177,8 @@ const App = (() => {
       document.getElementById('sbCreateBoard').style.display = '';
     }
 
-    document.getElementById('sbAvatar').addEventListener('click', openProfileModal);
-    document.getElementById('sbLogout').addEventListener('click', logout);
+    document.getElementById('sbAvatar')?.addEventListener('click', openProfileModal);
+    document.getElementById('sbLogout')?.addEventListener('click', logout);
     document.getElementById('navHome').addEventListener('click', (e) => { e.preventDefault(); goHome(); });
     document.getElementById('hamburger').addEventListener('click', openSidebar);
     document.getElementById('sbClose').addEventListener('click', closeSidebar);
@@ -1256,6 +1261,7 @@ const App = (() => {
       localStorage.setItem('bahemr_user', JSON.stringify(updatedUser));
       currentUser = updatedUser;
       updateSidebarAvatar(updatedUser); // FIX: was updateSidebar() — wrong name
+      updateTopUserProfile(updatedUser);      
       toast('프로필이 업데이트되었습니다.', 'success');
       closeProfileModal();
     } catch (err) { toast(err.message || '저장 중 오류가 발생했습니다.', 'error'); }
