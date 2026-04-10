@@ -2,13 +2,13 @@
  * users.js — 사용자 관련 API 핸들러
  *
  * 주요 수정사항:
- *  - PATCH /api/users/profile: profile_image Base64 크기 검증 추가
- *    D1 row 한계(~1MB)를 고려, Base64 문자열 800KB 초과 시 400 반환
- *  - profile_image 컬럼 없는 환경 safe fallback
+ * - PATCH /api/users/profile: profile_image Base64 크기 검증 추가
+ * D1 row 한계(~1MB)를 고려, Base64 문자열 800KB 초과 시 400 반환
+ * - profile_image 컬럼 없는 환경 safe fallback
  */
 import { json } from '../index.js';
-import { isAdmin, isSuperAdmin } from '../utils/auth.js';
-import { hashPassword, verifyPassword } from '../utils/crypto.js';
+// 💡 수정됨: crypto.js를 삭제하고, auth.js에서 hashPassword를 가져옵니다.
+import { isAdmin, isSuperAdmin, hashPassword } from '../utils/auth.js';
 
 // profile_image 컬럼 존재 캐시
 let _hasProfileImageCol = null;
