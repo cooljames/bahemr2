@@ -37,7 +37,11 @@ export async function verifyJWT(request, env) {
     const ok   = await crypto.subtle.verify('HMAC', key, sig, data);
     if (!ok) return null;
 
-    const jsonPayload = decodeJwtPart(parts[1]);
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const jsonPayload = decodeURIComponent(escape(atob(padded)));
+
+    
     const payload = JSON.parse(jsonPayload);
 
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
@@ -78,7 +82,8 @@ function b64url(data) {
 }
 
 function b64urlDecode(str) {
-  const padded = toPaddedBase64(str);
+  const base64 = str.replace(/-/g,'+').replace(/_/g,'/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4
   const binary = atob(padded);
   return Uint8Array.from(binary, c => c.charCodeAt(0));
 }
