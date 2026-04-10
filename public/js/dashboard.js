@@ -191,112 +191,6 @@ const App = (() => {
     window.location.href = '/index.html';
   }
 
-  // ── 프로필 편집 모달 ──────────────────────────────────────────────
-  function openProfileModal() {
-    const user = currentUser;
-    const modal = document.getElementById('modalProfile');
-
-    // 현재 값 채우기
-    document.getElementById('pfName').value  = user.name  || '';
-    document.getElementById('pfEmail').value = user.email || '';
-    document.getElementById('pfPassword').value        = '';
-    document.getElementById('pfPasswordConfirm').value = '';
-
-    // 프로필 이미지 미리보기
-    const preview = document.getElementById('pfImagePreview');
-    if (user.profile_image) {
-      preview.innerHTML = `<img src="${user.profile_image}" alt="프로필" />`;
-    } else {
-      preview.innerHTML = `<span class="pf-image-placeholder">${(user.name||'?').charAt(0).toUpperCase()}</span>`;
-    }
-
-    // 파일 입력 초기화
-    document.getElementById('pfImageInput').value = '';
-
-    modal.style.display = 'flex';
-  }
-
-  function closeProfileModal() {
-    document.getElementById('modalProfile').style.display = 'none';
-  }
-
-  function handleProfileImageChange(input) {
-    const file = input.files[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast('이미지 크기는 2MB 이하여야 합니다.', 'error');
-      input.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const preview = document.getElementById('pfImagePreview');
-      preview.innerHTML = `<img src="${e.target.result}" alt="미리보기" />`;
-      preview.dataset.newImage = e.target.result; // base64 저장
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function removeProfileImage() {
-    const preview = document.getElementById('pfImagePreview');
-    preview.innerHTML = `<span class="pf-image-placeholder">${(currentUser.name||'?').charAt(0).toUpperCase()}</span>`;
-    preview.dataset.newImage = 'remove';
-    document.getElementById('pfImageInput').value = '';
-  }
-
-  async function submitProfile() {
-    const name     = document.getElementById('pfName').value.trim();
-    const email    = document.getElementById('pfEmail').value.trim();
-    const password = document.getElementById('pfPassword').value;
-    const passwordConfirm = document.getElementById('pfPasswordConfirm').value;
-    const preview  = document.getElementById('pfImagePreview');
-
-    if (!name)  { toast('이름을 입력하세요.', 'error'); return; }
-    if (!email) { toast('이메일을 입력하세요.', 'error'); return; }
-
-    if (password || passwordConfirm) {
-      if (password.length < 6) { toast('비밀번호는 6자 이상이어야 합니다.', 'error'); return; }
-      if (password !== passwordConfirm) { toast('비밀번호가 일치하지 않습니다.', 'error'); return; }
-    }
-
-    const body = { name, email };
-    if (password) body.password = password;
-
-    // 이미지 처리
-    const newImage = preview.dataset.newImage;
-    if (newImage === 'remove') {
-      body.profile_image = null;
-    } else if (newImage && newImage.startsWith('data:')) {
-      body.profile_image = newImage;
-    }
-
-    const btn = document.querySelector('#modalProfile .btn-primary');
-    btn.disabled = true;
-    btn.textContent = '저장 중...';
-
-    try {
-      const res = await API.patch('/api/users/profile', body);
-
-      // 로컬 스토리지 유저 정보 갱신
-      const updatedUser = { ...currentUser, ...res.user };
-      currentUser = updatedUser;
-      API.setUser(updatedUser);
-
-      // 사이드바 즉시 반영
-      updateSidebarAvatar(updatedUser);
-      document.getElementById('welcomeMsg').textContent = `${updatedUser.name}님, 환영합니다.`;
-
-      toast('프로필이 저장되었습니다.', 'success');
-      closeProfileModal();
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '저장';
-    }
-  }
 
   // ── 대시보드 홈 ───────────────────────────────────────────────────
   async function goHome() {
@@ -1392,3 +1286,168 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!token) { window.location.href = '/index.html'; return; }
   App.init();
 });
+
+/**
+ * profile-patch.js
+ *
+ * dashboard.js 내 프로필 관련 함수 교체분.
+ * 핵심 변경: handleProfileImageChange()에서
+ *   Canvas API로 이미지를 200x200 이내로 리사이즈한 뒤
+ *   quality=0.82의 JPEG로 압축 → Base64 크기 ~100KB 이내로 제한.
+ *
+ * 이 파일 전체를 dashboard.js의 프로필 섹션과 교체하거나,
+ * 아래 함수들을 App IIFE 안에 붙여넣으세요.
+ */
+
+// ── 이미지 리사이즈 (Canvas) ────────────────────────────────────────
+/**
+ * @param {File} file       - 원본 이미지 파일
+ * @param {number} maxPx    - 최대 가로/세로 픽셀 (기본 256)
+ * @param {number} quality  - JPEG 품질 0~1 (기본 0.82)
+ * @returns {Promise<string>} data URI (image/jpeg)
+ */
+function resizeImageToDataUri(file, maxPx = 256, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('파일 읽기 실패'));
+    reader.onload  = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('이미지 디코딩 실패'));
+      img.onload  = () => {
+        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+        const w = Math.round(img.width  * ratio);
+        const h = Math.round(img.height * ratio);
+
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── 프로필 모달 열기 ─────────────────────────────────────────────────
+function openProfileModal() {
+  const modal = document.getElementById('modalProfile');
+  document.getElementById('pfName').value  = currentUser.name  || '';
+  document.getElementById('pfEmail').value = currentUser.email || '';
+  document.getElementById('pfPassword').value        = '';
+  document.getElementById('pfPasswordConfirm').value = '';
+
+  // 이미지 미리보기 초기화
+  const preview = document.getElementById('pfImagePreview');
+  if (currentUser.profile_image) {
+    preview.innerHTML = `<img src="${currentUser.profile_image}" style="width:100%;height:100%;object-fit:cover" alt="프로필" />`;
+  } else {
+    const initials = (currentUser.name || '?').charAt(0).toUpperCase();
+    preview.innerHTML = `<span class="pf-image-placeholder">${initials}</span>`;
+  }
+
+  profileImageData = undefined; // undefined = 변경 없음
+  modal.style.display = 'flex';
+}
+
+function closeProfileModal() {
+  document.getElementById('modalProfile').style.display = 'none';
+  profileImageData = undefined;
+}
+
+// ── 프로필 이미지 파일 선택 ──────────────────────────────────────────
+async function handleProfileImageChange(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const ALLOWED = ['image/jpeg','image/png','image/gif','image/webp'];
+  if (!ALLOWED.includes(file.type)) {
+    toast('JPG, PNG, GIF, WebP 이미지만 업로드 가능합니다.', 'error');
+    input.value = '';
+    return;
+  }
+
+  // 원본 크기 사전 체크 (20MB 초과면 리사이즈 전에 거부)
+  if (file.size > 20 * 1024 * 1024) {
+    toast('이미지 크기가 너무 큽니다. (최대 20MB)', 'error');
+    input.value = '';
+    return;
+  }
+
+  try {
+    toast('이미지 처리 중...', 'info');
+
+    // Canvas로 256px 이내 JPEG로 압축
+    const dataUri = await resizeImageToDataUri(file, 256, 0.82);
+
+    // 압축 후 크기 확인 (~600KB 초과 시 추가 압축)
+    const b64 = dataUri.split(',')[1] || '';
+    const approxBytes = Math.floor(b64.length * 3 / 4);
+
+    let finalUri = dataUri;
+    if (approxBytes > 600 * 1024) {
+      finalUri = await resizeImageToDataUri(file, 200, 0.70);
+    }
+
+    profileImageData = finalUri;
+
+    // 미리보기 갱신
+    const preview = document.getElementById('pfImagePreview');
+    preview.innerHTML = `<img src="${finalUri}" style="width:100%;height:100%;object-fit:cover" alt="프로필 미리보기" />`;
+
+    toast('이미지가 선택되었습니다. 저장 버튼을 눌러주세요.', 'info');
+  } catch (err) {
+    toast('이미지 처리 실패: ' + err.message, 'error');
+    input.value = '';
+  }
+}
+
+// ── 프로필 이미지 제거 ───────────────────────────────────────────────
+function removeProfileImage() {
+  if (!confirm('프로필 이미지를 삭제하시겠습니까?')) return;
+  profileImageData = ''; // 빈 문자열 = 서버에서 NULL로 저장
+  const initials = (currentUser.name || '?').charAt(0).toUpperCase();
+  document.getElementById('pfImagePreview').innerHTML =
+    `<span class="pf-image-placeholder">${initials}</span>`;
+  document.getElementById('pfImageInput').value = '';
+  toast('이미지가 제거되었습니다. 저장 버튼을 눌러주세요.', 'info');
+}
+
+// ── 프로필 저장 ──────────────────────────────────────────────────────
+async function submitProfile() {
+  const name    = document.getElementById('pfName').value.trim();
+  const pw      = document.getElementById('pfPassword').value;
+  const pwConf  = document.getElementById('pfPasswordConfirm').value;
+
+  if (!name) { toast('이름을 입력하세요.', 'error'); return; }
+
+  if (pw || pwConf) {
+    if (pw.length < 6) { toast('비밀번호는 6자 이상이어야 합니다.', 'error'); return; }
+    if (pw !== pwConf) { toast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+  }
+
+  const updateData = { name };
+  if (pw) updateData.password = pw;
+
+  // profileImageData:
+  //   undefined → 변경 없음 (서버에 전송 안 함)
+  //   ''        → 삭제 (서버에서 NULL 처리)
+  //   'data:...' → 새 이미지
+  if (profileImageData !== undefined) {
+    updateData.profile_image = profileImageData;
+  }
+
+  try {
+    const result = await API.patch('/api/users/profile', updateData);
+    const updatedUser = { ...currentUser, ...result.user };
+    localStorage.setItem('bahemr_user', JSON.stringify(updatedUser));
+    currentUser = updatedUser;
+    updateSidebar();
+    toast('프로필이 업데이트되었습니다.', 'success');
+    closeProfileModal();
+  } catch (err) {
+    toast(err.message || '저장 중 오류가 발생했습니다.', 'error');
+  }
+}
