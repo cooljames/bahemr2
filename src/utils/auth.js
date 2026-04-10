@@ -37,8 +37,7 @@ export async function verifyJWT(request, env) {
     const ok   = await crypto.subtle.verify('HMAC', key, sig, data);
     if (!ok) return null;
 
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(escape(atob(base64)));
+    const jsonPayload = decodeJwtPart(parts[1]);
     const payload = JSON.parse(jsonPayload);
 
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
@@ -69,16 +68,29 @@ export function isActive(user)     { return user.is_active === 1 && user.role !=
 function enc(str) { return new TextEncoder().encode(str); }
 
 function b64url(data) {
-  const str = data instanceof ArrayBuffer
-    ? btoa(String.fromCharCode(...new Uint8Array(data)))
-    : btoa(unescape(encodeURIComponent(typeof data === 'string' ? data : JSON.stringify(data))));
+  const bytes = data instanceof ArrayBuffer
+    ? new Uint8Array(data)
+    : ArrayBuffer.isView(data)
+      ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+      : enc(typeof data === 'string' ? data : JSON.stringify(data));
+  const str = btoa(String.fromCharCode(...bytes));
   return str.replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 }
 
 function b64urlDecode(str) {
-  const padded = str.replace(/-/g,'+').replace(/_/g,'/');
+  const padded = toPaddedBase64(str);
   const binary = atob(padded);
   return Uint8Array.from(binary, c => c.charCodeAt(0));
+}
+
+function decodeJwtPart(str) {
+  const bytes = b64urlDecode(str);
+  return new TextDecoder().decode(bytes);
+}
+
+function toPaddedBase64(str) {
+  const base64 = str.replace(/-/g,'+').replace(/_/g,'/');
+  return base64 + '='.repeat((4 - (base64.length % 4)) % 4);
 }
 
 async function importKey(secret) {
