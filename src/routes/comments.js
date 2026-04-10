@@ -1,5 +1,4 @@
 import { json } from '../index.js';
-import { isAdmin } from '../utils/auth.js';
 
 export async function handleComments(request, env, user, path) {
   const method = request.method;
@@ -23,8 +22,8 @@ export async function handleComments(request, env, user, path) {
     const comments = rows.results.map(c => ({
       ...c,
       content: c.is_deleted ? '(삭제된 댓글입니다.)' : c.content,
-      can_edit:   !c.is_deleted && (c.author_id === user.sub || isAdmin(user)),
-      can_delete: !c.is_deleted && (c.author_id === user.sub || isAdmin(user))
+      can_edit:   !c.is_deleted && c.author_id === user.sub,
+      can_delete: !c.is_deleted && c.author_id === user.sub
     }));
 
     return json({ comments });
@@ -53,7 +52,7 @@ export async function handleComments(request, env, user, path) {
     const commentId = parseInt(matchPatch[1]);
     const comment   = await env.DB.prepare('SELECT * FROM comments WHERE id = ?').bind(commentId).first();
     if (!comment) return json({ error: '댓글을 찾을 수 없습니다.' }, 404);
-    if (comment.author_id !== user.sub && !isAdmin(user)) return json({ error: '수정 권한이 없습니다.' }, 403);
+    if (comment.author_id !== user.sub) return json({ error: '수정 권한이 없습니다.' }, 403);
     if (comment.is_deleted) return json({ error: '삭제된 댓글은 수정할 수 없습니다.' }, 400);
 
     const { content } = await request.json();
@@ -72,7 +71,7 @@ export async function handleComments(request, env, user, path) {
     const commentId = parseInt(matchDel[1]);
     const comment   = await env.DB.prepare('SELECT * FROM comments WHERE id = ?').bind(commentId).first();
     if (!comment) return json({ error: '댓글을 찾을 수 없습니다.' }, 404);
-    if (comment.author_id !== user.sub && !isAdmin(user)) return json({ error: '삭제 권한이 없습니다.' }, 403);
+    if (comment.author_id !== user.sub) return json({ error: '삭제 권한이 없습니다.' }, 403);
 
     await env.DB.prepare(
       `UPDATE comments SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?`
