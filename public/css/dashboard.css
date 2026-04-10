@@ -354,12 +354,19 @@ input, select, textarea { font-family: var(--font); }
 .btn-ghost:hover { color: var(--text); border-color: var(--text2); }
 
 .btn-danger {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.3);
-  border-radius: var(--radius); color: var(--error); font-size: 13px;
-  padding: 6px 12px; cursor: pointer; transition: background .15s;
+  background-color: #ef4444; /* 경고를 나타내는 붉은색 */
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease;
 }
-.btn-danger:hover { background: rgba(248,81,73,.2); }
+
+.btn-danger:hover {
+  background-color: #dc2626;
+}
 
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 
