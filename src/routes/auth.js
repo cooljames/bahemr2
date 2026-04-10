@@ -1,6 +1,6 @@
 import { signJWT, hashPassword, checkPassword, verifyJWT, corsHeaders } from '../utils/auth.js';
 
-// 내부용 응답 함수 (순환 참조 방지)
+// 내부용 응답 함수 (순환 참조 방지).
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status,
   headers: { ...corsHeaders, 'Content-Type': 'application/json' }
