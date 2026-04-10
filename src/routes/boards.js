@@ -124,14 +124,32 @@ export async function handleBoards(request, env, user, path) {
       return json({ message: '게시판이 수정되었습니다.' });
     }
 
-      // --- 5. DELETE /api/boards/:id (삭제/비활성화) ---
-          const match = path.match(/^\/api\/boards\/(\d+)$/);
-          if (match && method === 'DELETE') {
-            
-            // [보안] 게시판 삭제는 최고 관리자(superadmin)만 가능
-            if (!isSuperAdmin(user)) {
-              return json({ error: '게시판 삭제 권한은 시스템 관리자(superadmin)에게만 있습니다.' }, 403);
-            }
+
+
+    // ... 기존 PATCH 로직 끝나는 지점 아래에 ...
+
+    // --- 5. DELETE /api/boards/:id (삭제/비활성화) ---
+    const match = path.match(/^\/api\/boards\/(\d+)$/);
+    if (match && method === 'DELETE') {
+      const boardId = parseInt(match[1], 10);
+      
+      if (!isSuperAdmin(user)) {
+        return json({ error: '슈퍼관리자만 삭제할 수 있습니다.' }, 403);
+      }
+
+      try {
+        await env.DB.prepare('UPDATE boards SET is_active = 0 WHERE id = ?')
+          .bind(boardId)
+          .run();
+        return json({ message: '게시판이 비활성화되었습니다.' });
+      } catch (err) {
+        return json({ error: '삭제 중 오류 발생' }, 500);
+      }
+    }
+
+    // [중요] 이 부분의 중괄호 개수를 확인하세요!
+    return json({ error: '잘못된 요청입니다.' }, 404);
+} // <--- handleBoards 함수를 닫는 마지막 중괄호는 딱 "하나"여야 합니다.
       
             const boardId = parseInt(match[1], 10);
       
