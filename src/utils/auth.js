@@ -83,7 +83,7 @@ function b64url(data) {
 
 function b64urlDecode(str) {
   const base64 = str.replace(/-/g,'+').replace(/_/g,'/');
-  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   const binary = atob(padded);
   return Uint8Array.from(binary, c => c.charCodeAt(0));
 }
