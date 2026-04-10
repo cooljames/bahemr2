@@ -115,18 +115,19 @@ const App = (() => {
     }
   }
 
-  function initThemeToggle() {
-    let isDay = localStorage.getItem('bahemr_theme') === 'day';
-    applyTheme(isDay);
-    const toggle = document.getElementById('swipeToggle');
-    if (toggle) {
-      toggle.addEventListener('click', () => {
-        isDay = !isDay;
-        localStorage.setItem('bahemr_theme', isDay ? 'day' : 'night');
-        applyTheme(isDay);
+    function initTheme() {
+      const savedTheme = localStorage.getItem('bahemr_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', newTheme);
+        localStorage.setItem('bahemr_theme', newTheme);
       });
     }
-  }
+      
 
   // ── 사이드바 아바타 업데이트 ──────────────────────────────────────
   function updateSidebarAvatar(user) {
