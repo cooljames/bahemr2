@@ -1,5 +1,5 @@
 /**
- * bahEMR 사전접수 포털 — Cloudflare Workers 메인 엔트리
+ * bahEMR 사전접수 포털 — Cloudflare Workers 메인 엔트리.
  */
 import { handleAuth }        from './routes/auth.js';
 import { handleUsers }       from './routes/users.js';
