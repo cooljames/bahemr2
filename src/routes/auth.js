@@ -1,18 +1,10 @@
-import { signJWT, hashPassword, checkPassword, verifyJWT } from '../utils/auth.js';
+import { signJWT, hashPassword, checkPassword, verifyJWT, corsHeaders } from '../utils/auth.js';
 
-// 순환 참조 방지를 위해 json 헬퍼 함수를 상단에 직접 선언 (또는 utils/response.js 등으로 분리 권장)
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
+// 내부용 응답 함수 (순환 참조 방지)
+const json = (data, status = 200) => new Response(JSON.stringify(data), {
+  status,
+  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+});
 
 export async function handleAuth(request, env, path) {
   const method = request.method;
@@ -23,17 +15,12 @@ export async function handleAuth(request, env, path) {
       const { email, password } = await request.json();
       if (!email || !password) return json({ error: '이메일과 비밀번호를 입력하세요.' }, 400);
 
-      let user;
-      try {
-        user = await env.DB.prepare(
-          `SELECT u.*, c.name as company_name
-           FROM users u
-           LEFT JOIN companies c ON c.id = u.company_id
-           WHERE u.email = ? AND u.is_active = 1`
-        ).bind(email.trim().toLowerCase()).first();
-      } catch (dbErr) {
-        return json({ error: 'DB 조회 에러: ' + dbErr.message }, 500);
-      }
+      const user = await env.DB.prepare(
+        `SELECT u.*, c.name as company_name
+         FROM users u
+         LEFT JOIN companies c ON c.id = u.company_id
+         WHERE u.email = ? AND u.is_active = 1`
+      ).bind(email.trim().toLowerCase()).first();
 
       if (!user) return json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401);
 
@@ -41,39 +28,32 @@ export async function handleAuth(request, env, path) {
       if (!ok) return json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401);
 
       if (user.role === 'pending') {
-        return json({ error: '관리자 승인 대기 중입니다. 담당자에게 문의하세요.' }, 403);
+        return json({ error: '관리자 승인 대기 중입니다.' }, 403);
       }
 
-      let token;
-      try {
-        const secretKey = env.JWT_SECRET || 'my_temporary_secret_key_12345'; 
-        
-        token = await signJWT({
-          sub:        user.id,
-          email:      user.email,
-          name:       user.name,
-          role:       user.role,
-          company_id: user.company_id,
-          exp:        Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7  // 7일
-        }, secretKey);
-      } catch (jwtErr) {
-        return json({ error: '토큰 발급 에러: ' + jwtErr.message }, 500);
-      }
+      const secretKey = env.JWT_SECRET || 'fallback_secret_key';
+      const token = await signJWT({
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        company_id: user.company_id,
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7)
+      }, secretKey);
 
       return json({
         token,
         user: {
-          id:           user.id,
-          email:        user.email,
-          name:         user.name,
-          role:         user.role,
-          company_id:   user.company_id,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          company_id: user.company_id,
           company_name: user.company_name
         }
       });
-
     } catch (err) {
-      return json({ error: '서버 내부 에러(JSON 파싱 등): ' + err.message }, 500);
+      return json({ error: '로그인 처리 에러: ' + err.message }, 500);
     }
   }
 
@@ -82,8 +62,7 @@ export async function handleAuth(request, env, path) {
     try {
       const { email, password, name, company_id } = await request.json();
       if (!email || !password || !name) return json({ error: '필수 항목을 모두 입력하세요.' }, 400);
-      if (password.length < 8) return json({ error: '비밀번호는 8자 이상이어야 합니다.' }, 400);
-
+      
       const exists = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
         .bind(email.trim().toLowerCase()).first();
       if (exists) return json({ error: '이미 사용 중인 이메일입니다.' }, 409);
@@ -94,44 +73,23 @@ export async function handleAuth(request, env, path) {
          VALUES (?, ?, ?, 'pending', ?)`
       ).bind(email.trim().toLowerCase(), hashed, name.trim(), company_id || null).run();
 
-      return json({ message: '회원가입이 완료되었습니다. 관리자 승인 후 이용 가능합니다.' }, 201);
+      return json({ message: '회원가입 완료. 관리자 승인을 기다려주세요.' }, 201);
     } catch (err) {
       return json({ error: '회원가입 처리 에러: ' + err.message }, 500);
     }
   }
 
-  // GET /api/auth/me — 토큰으로 사용자 정보 조회
+  // GET /api/auth/me
   if (path === '/api/auth/me' && method === 'GET') {
-    try {
-      // (수정) 동적 import 제거, 상단 정적 import 사용
-      const user = await verifyJWT(request, env);
-      if (!user) return json({ error: '인증이 필요합니다.' }, 401);
-
-      const dbUser = await env.DB.prepare(
-        `SELECT u.id, u.email, u.name, u.role, u.company_id, u.is_active,
-                c.name as company_name, c.type as company_type
-         FROM users u
-         LEFT JOIN companies c ON c.id = u.company_id
-         WHERE u.id = ?`
-      ).bind(user.sub).first();
-
-      if (!dbUser) return json({ error: '사용자를 찾을 수 없습니다.' }, 404);
-      return json({ user: dbUser });
-    } catch (err) {
-      return json({ error: '사용자 정보 조회 에러: ' + err.message }, 500);
-    }
-  }
-
-  // GET /api/auth/companies-public
-  if (path === '/api/auth/companies-public' && method === 'GET') {
-    try {
-      const rows = await env.DB.prepare(
-        `SELECT id, name, type FROM companies WHERE is_active = 1 ORDER BY name`
-      ).all();
-      return json({ companies: rows.results });
-    } catch (err) {
-      return json({ error: '관계사 목록 조회 에러: ' + err.message }, 500);
-    }
+    const user = await verifyJWT(request, env);
+    if (!user) return json({ error: '인증 필요' }, 401);
+    
+    const dbUser = await env.DB.prepare(
+      `SELECT u.id, u.email, u.name, u.role, u.company_id, c.name as company_name
+       FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.id = ?`
+    ).bind(user.sub).first();
+    
+    return json({ user: dbUser });
   }
 
   return json({ error: '존재하지 않는 인증 API입니다.' }, 404);
