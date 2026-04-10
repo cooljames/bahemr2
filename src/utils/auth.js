@@ -1,6 +1,6 @@
 
 /**
- * JWT 인증 유틸리티
+ * JWT 인증 유틸리티.
  * Workers 환경: Web Crypto API 사용 (Node.js crypto 불가)
  */
 
