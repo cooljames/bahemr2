@@ -1415,6 +1415,25 @@ function removeProfileImage() {
   toast('이미지가 제거되었습니다. 저장 버튼을 눌러주세요.', 'info');
 }
 
+// Day/Night 토글
+const swipeToggle = document.getElementById('swipeToggle');
+if (swipeToggle) {
+  let isDay = localStorage.getItem('bahemr_theme') === 'day';
+  applyTheme(isDay);
+  swipeToggle.addEventListener('click', () => {
+    isDay = !isDay;
+    localStorage.setItem('bahemr_theme', isDay ? 'day' : 'night');
+    applyTheme(isDay);
+  });
+}
+function applyTheme(isDay) {
+  document.body.classList.toggle('day-mode', isDay);
+  const thumb = document.getElementById('swipeThumb');
+  if (thumb) thumb.classList.toggle('is-day', isDay);
+  const icon = document.getElementById('swipeIcon');
+  if (icon) icon.textContent = isDay ? '☀️' : '🌙';
+}
+
 // ── 프로필 저장 ──────────────────────────────────────────────────────
 async function submitProfile() {
   const name    = document.getElementById('pfName').value.trim();
