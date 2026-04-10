@@ -155,7 +155,7 @@ const App = (() => {
     currentUser = user;
 
     updateSidebarAvatar(user);
-    initThemeToggle();
+    initTheme();
 
     document.getElementById('welcomeMsg').textContent = `${user.name}님, 환영합니다.`;
 
