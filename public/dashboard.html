@@ -408,6 +408,47 @@
 <!-- 토스트 알림 -->
 <div class="toast-container" id="toastContainer"></div>
 
+<script>  
+  // 게시판 삭제 함수 (superadmin 전용)
+async function deleteBoard(boardId) {
+  // 1. 실수 방지를 위한 확인창
+  if (!confirm('⚠️ 정말로 이 게시판을 삭제(비활성화) 하시겠습니까?\n삭제 후 일반 사용자는 이 게시판에 접근할 수 없습니다.')) {
+    return;
+  }
+
+  try {
+    // JWT 토큰 가져오기 (기존 로그인 시 저장한 방식에 맞게 수정)
+    const token = localStorage.getItem('token'); 
+    
+    // 2. 삭제 API 호출
+    const response = await fetch(`/api/boards/${boardId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const result = await response.json();
+
+    // 3. 결과 처리
+    if (response.ok) {
+      alert('게시판이 성공적으로 삭제되었습니다.');
+      
+      // UI 갱신: 게시판 목록 다시 불러오기 (기존에 정의된 함수 호출)
+      // loadBoards(); 
+      // 만약 렌더링 함수가 복잡하다면 페이지를 새로고침 하는 것도 방법입니다.
+      location.reload(); 
+    } else {
+      // 권한 없음(403) 등의 에러 메시지 출력
+      alert(`삭제 실패: ${result.error}`);
+    }
+  } catch (error) {
+    console.error('[Board Delete Error]', error);
+    alert('서버와 통신 중 오류가 발생했습니다.');
+  }
+}
+</script>
 <script src="/js/api.js"></script>
 <script src="/js/dashboard.js"></script>
 </body>
