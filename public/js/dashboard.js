@@ -5,7 +5,7 @@
  *  - 프로필 편집 모달 기능 추가 (openProfileModal, closeProfileModal, submitProfile 등)
  *  - 글쓰기 첨부파일 업로드 순서 수정 (글 저장 후 → 파일 업로드)
  *  - 댓글 첨부파일 업로드 API 수정 (comment_id 파라미터 사용)
- *  - 사이드바 아바타에 프로필 이미지 반영
+ *  - 사이드바 아바타에 프로필 이미지 반영.
  */
 const App = (() => {
   let currentUser    = null;
