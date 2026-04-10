@@ -2,7 +2,7 @@
  * bahEMR — 대시보드 메인 SPA 컨트롤러
  * Optimized & Debugged
  *
- * 수정 사항:
+ * 수정 사항:.
  *  1. profile-patch.js 코드를 App IIFE 내부로 통합 (스코프 버그 수정)
  *  2. profileImageData를 IIFE 내부 변수로 이동
  *  3. submitProfile()의 updateSidebar() → updateSidebarAvatar() 오타 수정
