@@ -124,16 +124,47 @@ export async function handleBoards(request, env, user, path) {
       return json({ message: '게시판이 수정되었습니다.' });
     }
 
-    // --- 5. DELETE /api/boards/:id (삭제/비활성화) ---
-    if (method === 'DELETE') {
-      if (!isSuperAdmin(user)) return json({ error: '슈퍼관리자만 삭제할 수 있습니다.' }, 403);
+      // --- 5. DELETE /api/boards/:id (삭제/비활성화) ---
+          const match = path.match(/^\/api\/boards\/(\d+)$/);
+          if (match && method === 'DELETE') {
+            
+            // [보안] 게시판 삭제는 최고 관리자(superadmin)만 가능
+            if (!isSuperAdmin(user)) {
+              return json({ error: '게시판 삭제 권한은 시스템 관리자(superadmin)에게만 있습니다.' }, 403);
+            }
       
-      await env.DB.prepare('UPDATE boards SET is_active = 0 WHERE id = ?')
-        .bind(boardId)
-        .run();
+            const boardId = parseInt(match[1], 10);
+      
+            try {
+              // 1. 게시판 존재 여부 확인
+              const board = await env.DB.prepare('SELECT id FROM boards WHERE id = ?').bind(boardId).first();
+              if (!board) {
+                return json({ error: '존재하지 않거나 이미 삭제된 게시판입니다.' }, 404);
+              }
+      
+              // 2. 소프트 삭제 (is_active = 0) 처리
+              // 물리적 삭제(DELETE)를 할 경우 하위 게시글(posts)과 첨부파일이 연쇄 삭제(CASCADE)되어
+              // 중요한 접수 데이터가 유실될 위험이 있으므로 상태값만 변경합니다.
+              await env.DB.prepare('UPDATE boards SET is_active = 0 WHERE id = ?').bind(boardId).run();
+      
+              return json({ message: '게시판이 성공적으로 삭제(비활성화) 되었습니다.' });
+              
+              /* // 만약 (위험을 감수하고) DB에서 영구 삭제를 원하신다면 아래 코드를 대신 사용하세요:
+              // await env.DB.prepare('DELETE FROM boards WHERE id = ?').bind(boardId).run();
+              // return json({ message: '게시판이 영구적으로 삭제되었습니다.' });
+              */
+      
+            } catch (err) {
+              console.error('[Board Delete Error]', err);
+              return json({ error: '게시판 삭제 처리 중 서버 오류가 발생했습니다.' }, 500);
+            }
+          }
+      
+          // 일치하는 라우트가 없을 경우
+          return json({ error: '지원하지 않는 게시판 API 요청입니다.' }, 405);
+      }
 
-      return json({ message: '게시판이 삭제되었습니다.' });
-    }
+    
   }
 
   return json({ error: '존재하지 않는 게시판 API입니다.' }, 404);
