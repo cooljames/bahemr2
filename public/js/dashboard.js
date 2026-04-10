@@ -1261,6 +1261,157 @@ const App = (() => {
     } catch (err) { toast(err.message || '저장 중 오류가 발생했습니다.', 'error'); }
   }
 
+function initBoardShortcuts() {
+  const container = document.getElementById('boardShortcuts');
+  let draggedElement = null;
+  
+  container.addEventListener('dragstart', (e) => {
+    draggedElement = e.target.closest('.board-shortcut');
+    draggedElement.classList.add('dragging');
+  });
+  
+  container.addEventListener('dragend', (e) => {
+    draggedElement.classList.remove('dragging');
+    saveBoardOrder();
+  });
+  
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const afterElement = getDragAfterElement(container, e.clientY);
+    if (afterElement == null) {
+      container.appendChild(draggedElement);
+    } else {
+      container.insertBefore(draggedElement, afterElement);
+    }
+  });
+}
+
+function saveBoardOrder() {
+  const shortcuts = document.querySelectorAll('.board-shortcut');
+  const order = Array.from(shortcuts).map(s => s.dataset.boardId);
+  localStorage.setItem('bahemr_board_order', JSON.stringify(order));
+}
+
+function resetBoardOrder() {
+  localStorage.removeItem('bahemr_board_order');
+  loadBoardShortcuts(); // 재로드
+}
+
+async function loadBoardManageView() {
+  if (currentUser.role !== 'superadmin') {
+    toast('슈퍼관리자만 접근할 수 있습니다.', 'error');
+    return;
+  }
+  
+  showView('board-manage');
+  setBreadcrumb([{label: '게시판 삭제'}]);
+  
+  const content = document.getElementById('boardManageContent');
+  const boards = await API.get('/api/boards');
+  
+  let html = '<div class="mgmt-table-wrap"><table class="mgmt-table">';
+  html += '<thead><tr><th>ID</th><th>게시판명</th><th>타입</th><th>게시글 수</th><th>작업</th></tr></thead><tbody>';
+  
+  boards.boards.forEach(b => {
+    html += `<tr>
+      <td>${b.id}</td>
+      <td>${esc(b.name)}</td>
+      <td>${esc(b.type)}</td>
+      <td>${b.post_count || 0}</td>
+      <td><button class="btn-danger btn-sm" onclick="App.deleteBoard(${b.id}, '${esc(b.name)}')">삭제</button></td>
+    </tr>`;
+  });
+  
+  html += '</tbody></table></div>';
+  content.innerHTML = html;
+}
+
+async function deleteBoard(boardId, boardName) {
+  if (!confirm(`"${boardName}" 게시판을 삭제하시겠습니까?\n\n⚠️ 모든 게시글과 댓글이 삭제됩니다.`)) return;
+  
+  try {
+    await API.delete(`/api/boards/${boardId}`);
+    toast('게시판이 삭제되었습니다.', 'success');
+    loadBoardManageView();
+    loadBoards(); // 사이드바 새로고침
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+  function initFileDropzone(dropzoneEl, fileInputEl, fileListEl) {
+  const files = [];
+  
+  // 드래그앤드롭
+  dropzoneEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzoneEl.classList.add('dragover');
+  });
+  
+  dropzoneEl.addEventListener('dragleave', () => {
+    dropzoneEl.classList.remove('dragover');
+  });
+  
+  dropzoneEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzoneEl.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+  
+  // 클릭
+  fileInputEl.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+  });
+  
+  function handleFiles(fileList) {
+    Array.from(fileList).forEach(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        toast('파일 크기는 5MB 이하여야 합니다.', 'error');
+        return;
+      }
+      files.push(file);
+      renderFileList();
+    });
+  }
+  
+  function renderFileList() {
+    fileListEl.innerHTML = files.map((f, i) => `
+      <div class="file-list-item">
+        <span class="file-list-item-name">${esc(f.name)}</span>
+        <span>${fileSize(f.size)}</span>
+        <button class="file-list-item-remove" onclick="removeFile(${i})">×</button>
+      </div>
+    `).join('');
+  }
+  
+  window.removeFile = (index) => {
+    files.splice(index, 1);
+    renderFileList();
+  };
+  
+  return files;
+}
+
+  function updateTopUserProfile(user) {
+  const topAvatar = document.getElementById('topAvatar');
+  const topName = document.getElementById('topName');
+  const topRole = document.getElementById('topRole');
+  
+  if (user.profile_image) {
+    topAvatar.innerHTML = `<img src="${user.profile_image}" alt="프로필" />`;
+  } else {
+    topAvatar.textContent = user.name.charAt(0).toUpperCase();
+  }
+  
+  topName.textContent = user.name;
+  topRole.textContent = ROLE_LABEL[user.role] || user.role;
+  
+  // 클릭 이벤트
+  topAvatar.addEventListener('click', () => openProfileModal());
+  document.getElementById('topLogout').addEventListener('click', logout);
+}
+  
+
   // ── Public API ────────────────────────────────────────────────────
   return {
     init, goHome,
