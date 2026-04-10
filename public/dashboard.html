@@ -448,6 +448,28 @@ async function deleteBoard(boardId) {
     alert('서버와 통신 중 오류가 발생했습니다.');
   }
 }
+
+  // 예시: 게시판 목록을 화면에 렌더링하는 부분
+function renderBoardItem(board, currentUser) {
+  // 기본 게시판 정보 HTML
+  let html = `
+    <div class="board-item">
+      <h3>${board.name}</h3>
+      <p>${board.description}</p>
+  `;
+
+  // [추가된 부분] currentUser가 superadmin일 때만 삭제 버튼 렌더링
+  if (currentUser && currentUser.role === 'superadmin') {
+    html += `
+      <button class="btn-danger btn-sm" onclick="deleteBoard(${board.id})">
+        게시판 삭제
+      </button>
+    `;
+  }
+
+  html += `</div>`;
+  return html;
+}
 </script>
 <script src="/js/api.js"></script>
 <script src="/js/dashboard.js"></script>
