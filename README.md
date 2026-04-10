@@ -1,7 +1,7 @@
 # bahEMR2 사전접수 포털
 
 관계사(협력사)가 EMR 정식 접수 전 대상자 데이터를 수집·제출하는 웹 포털입니다.  
-Cloudflare Workers + D1 (SQLite) + R2 (파일 스토리지) 기반으로 구동됩니다.
+Cloudflare Workers + D1 (SQLite) 기반으로 구동됩니다.
 
 ---
 
