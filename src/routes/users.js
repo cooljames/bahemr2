@@ -25,7 +25,7 @@ export async function handleAttachments(request, env, user, path) {
       return json({ error: 'post_id 또는 comment_id가 필요합니다.' }, 400);
     }
 
-    // 게시글/댓글 소유권 확인
+    // 게시글/댓글 소유권 확인.
     if (post_id) {
       const post = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(post_id).first();
       if (!post) return json({ error: '게시글을 찾을 수 없습니다.' }, 404);
