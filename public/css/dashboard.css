@@ -20,6 +20,10 @@
   --warning:   #d29922;
   --success:   #3fb950;
   --info:      #58a6ff;
+  --section-title:   #58a6ff;
+  --section-body:    #3fb950;
+  --section-attach:  #d29922;
+  --section-comment: #c678dd;   
 }
 
 /* ── 라이트 테마 ── */
@@ -685,20 +689,27 @@ input, select, textarea { font-family: var(--font); }
 .rg-value:empty::after { content: '—'; color: var(--muted); }
 
 /* 게시글 본문 */
-.post-body-section { margin-bottom: 24px; }
-.post-body-section h4,
-.attach-section h4,
-.comment-section h4 {
+.post-read-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+.read-group { margin: 0; }
+.read-group > label {
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 10px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .06em;
 }
-.post-body-section h4 { color: var(--section-body); }
-.attach-section h4 { color: var(--section-attach); }
-.comment-section h4 { color: var(--section-comment); }
-.post-body { font-size: 14.5px; line-height: 1.8; color: var(--text2); white-space: pre-wrap; word-break: break-word; }
+.post-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  min-height: 180px;
+}
 
 /* 상태 변경 바 */
 .status-change-bar { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -737,7 +748,7 @@ input, select, textarea { font-family: var(--font); }
 .history-time { color: var(--muted); font-family: var(--mono); white-space: nowrap; }
 
 /* 댓글 (반응형 전체화면) */
-.comment-section { margin-bottom: 28px; }
+.comment-section { margin-bottom: 0; }
 .comment-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
 .comment-item { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 14px 16px; }
 .comment-item.is-reply { margin-left: 28px; border-left: 2px solid var(--primary); background: rgba(0,165,116,.03); }
