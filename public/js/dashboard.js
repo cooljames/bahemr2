@@ -478,15 +478,17 @@ const App = (() => {
           </div>`;
       }
 
+      html += `<div class="post-read-form">`;
       html += `
-        <div class="post-body-section section-card section-body">
-          <h4>본문</h4>
+        <div class="post-body-section form-group read-group">
+          <label>본문</label>
           <div class="post-body">${esc(post.content)}</div>
         </div>`;
-      
       html += renderAttachments(data.attachments, isOwner || isAdmin);
       html += renderHistory(data.history);
       html += await renderCommentsHtml(postId);
+      html += renderHistory(data.history);
+      html += `</div>`;
 
       document.getElementById('postDetail').innerHTML = html;
       bindPostEvents();
@@ -540,8 +542,8 @@ const App = (() => {
     const isStaff   = ['superadmin','admin','staff'].includes(currentUser.role);
     const canUpload = isStaff || currentUser.role === 'partner';
     return `
-   <div class="attach-section section-card section-attach">
-        <h4>첨부파일 (${attachments.length})</h4>
+        <div class="attach-section form-group read-group">
+        <label>첨부파일 (${attachments.length})</label>        
         <div class="attach-list" id="attachList">
           ${!attachments.length
             ? '<div style="color:var(--muted);font-size:13px">첨부파일 없음</div>'
@@ -634,8 +636,9 @@ const App = (() => {
       };
 
       return `
-        <div class="comment-section section-card section-comment">
-          <h4>댓글 (${comments.filter(c => !c.is_deleted).length})</h4>
+          <div class="comment-section form-group read-group">
+          <label>댓글 (${comments.filter(c => !c.is_deleted).length})</label>
+
           <div class="comment-list" id="commentList">
             ${topLevel.length ? topLevel.map(c => renderComment(c)).join('') : '<div style="color:var(--muted);font-size:13px">댓글이 없습니다.</div>'}
           </div>
