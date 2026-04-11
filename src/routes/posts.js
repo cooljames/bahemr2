@@ -5,7 +5,7 @@ export async function handlePosts(request, env, user, path) {
   const method = request.method;
   const url    = new URL(request.url);
 
-  // GET /api/posts?board_id=&status=&company_id=&page=
+  // GET /api/posts?board_id=&status=&company_id=&page= .
   if (path === '/api/posts' && method === 'GET') {
     const board_id   = url.searchParams.get('board_id');
     const status     = url.searchParams.get('status') || '';
