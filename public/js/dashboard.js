@@ -579,13 +579,19 @@ const App = (() => {
     const previewDiv = document.getElementById('commentAttachmentPreview');
     if (!previewDiv) return;
     if (!commentFiles.length) { previewDiv.innerHTML = ''; return; }
-    previewDiv.innerHTML = commentFiles.map((file, i) => `
-      <div class="file-list-item">
-        <span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>
+    previewDiv.innerHTML = commentFiles.map((file, i) => {
+      const isImage = file.type && file.type.startsWith('image/');
+      const blobUrl = isImage ? URL.createObjectURL(file) : '';
+      return `
+      <div class="file-list-item ${isImage ? 'file-list-item--image' : ''}">
+        ${isImage
+          ? `<img class="file-list-thumb" src="${blobUrl}" alt="${esc(file.name)}" onclick="App.viewLocalImage('${blobUrl}','${esc(file.name)}')" />`
+          : `<span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>`}
         <span class="file-list-item-name">${esc(file.name)}</span>
         <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${fileSize(file.size)}</span>
         <button type="button" class="file-list-item-remove" onclick="App.removeCommentFile(${i})" title="제거">✕</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function renderAttachments(attachments, canDelete) {
@@ -827,6 +833,18 @@ const App = (() => {
     document.body.appendChild(modal);
   }
 
+  function viewLocalImage(blobUrl, filename) {
+    const modal = document.createElement('div');
+    modal.className = 'image-modal';
+    modal.innerHTML = `
+      <div class="image-modal-overlay" onclick="this.parentElement.remove()"></div>
+      <div class="image-modal-content">
+        <img src="${blobUrl}" alt="${esc(filename)}" />
+        <button class="image-modal-close" onclick="this.parentElement.parentElement.remove()">✕</button>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+
   async function deleteFile(attId) {
     if (!confirm('첨부파일을 삭제하시겠습니까?')) return;
     try {
@@ -959,13 +977,19 @@ const App = (() => {
     const previewDiv = document.getElementById('attachmentPreview');
     if (!previewDiv) return;
     if (!writeFiles.length) { previewDiv.innerHTML = ''; return; }
-    previewDiv.innerHTML = writeFiles.map((file, i) => `
-      <div class="file-list-item">
-        <span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>
+    previewDiv.innerHTML = writeFiles.map((file, i) => {
+      const isImage = file.type && file.type.startsWith('image/');
+      const blobUrl = isImage ? URL.createObjectURL(file) : '';
+      return `
+      <div class="file-list-item ${isImage ? 'file-list-item--image' : ''}">
+        ${isImage
+          ? `<img class="file-list-thumb" src="${blobUrl}" alt="${esc(file.name)}" onclick="App.viewLocalImage('${blobUrl}','${esc(file.name)}')" />`
+          : `<span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>`}
         <span class="file-list-item-name">${esc(file.name)}</span>
         <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${fileSize(file.size)}</span>
         <button type="button" class="file-list-item-remove" onclick="App.removeWriteFile(${i})" title="제거">✕</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function renderReceptionForm(rd = {}) {
@@ -1541,7 +1565,7 @@ async function deleteBoard(boardId, boardName) {
     init, goHome,
     openBoard, loadPosts, loadPost, goPage,
     openWriteView, openEditView, submitPost, deletePost,
-    uploadFiles, downloadFile, deleteFile, viewImage,
+    uploadFiles, downloadFile, deleteFile, viewImage, viewLocalImage,
     changeStatus, changeAssign,
     replyTo, cancelReply, editComment, deleteComment,
     removeWriteFile, removeCommentFile,

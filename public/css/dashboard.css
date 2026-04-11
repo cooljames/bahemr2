@@ -914,6 +914,25 @@ input, select, textarea { font-family: var(--font); }
   display: flex;
 }
 
+/* 이미지 썸네일 미리보기 */
+.file-list-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform .15s, box-shadow .15s;
+}
+.file-list-thumb:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.file-list-item--image {
+  padding: 6px 10px;
+}
+
 .comment-form-footer { 
   display: flex; 
   justify-content: flex-end; 
