@@ -175,7 +175,7 @@ const App = (() => {
     }
     if (user.role === 'superadmin') {
       document.getElementById('sbCreateBoard').style.display = '';
-      document.getElementById('sbBoardManageHome').style.display = '';      
+      document.getElementById('sbBoardManageHome').style.display = '';
     }
 
     document.getElementById('sbAvatar')?.addEventListener('click', openProfileModal);
@@ -191,7 +191,7 @@ const App = (() => {
         const view = el.dataset.view;
         if      (view === 'users')     loadUsersView();
         else if (view === 'companies') loadCompaniesView();
-        else if (view === 'board-manage') loadBoardManageView();          
+        else if (view === 'board-manage') loadBoardManageView();
         else if (view === 'home')      goHome();
         closeSidebar();
       });
@@ -405,7 +405,6 @@ const App = (() => {
       const rd    = data.reception_data;
       const board = boards.find(b => b.id === post.board_id) || {};
       const isOwner = post.author_id === currentUser.sub;
-      const isAdmin = ['superadmin','admin'].includes(currentUser.role);
       const isStaff = ['superadmin','admin','staff'].includes(currentUser.role);
 
       setBreadcrumb([
@@ -418,7 +417,7 @@ const App = (() => {
       });
 
       let html = `
-      <div class="post-header section-card section-title">
+        <div class="post-header section-card section-title">
           <div class="post-meta-row">
             <span class="post-meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -431,11 +430,6 @@ const App = (() => {
             </span>
             <span class="post-meta-item">👁 ${post.view_count}</span>
             ${post.status ? badgeHtml(post.status) : ''}
-          </div>
-          <div class="post-actions">
-            ${(isOwner && post.status === 'submitted') || isAdmin ? `<button class="btn-secondary btn-sm" onclick="App.openEditView()">수정</button>` : ''}
-            ${isOwner || isAdmin ? `<button class="btn-danger btn-sm" onclick="App.deletePost()">삭제</button>` : ''}
-            <button class="btn-ghost btn-sm" onclick="App.openBoard(${post.board_id})">목록으로</button>
           </div>
         </div>`;
 
@@ -487,7 +481,13 @@ const App = (() => {
           <label>본문</label>
           <div class="post-body">${esc(post.content)}</div>
         </div>`;
-      html += renderAttachments(data.attachments, isOwner || isAdmin);
+      html += `
+        <div class="post-actions post-actions-bottom">
+          ${isOwner ? `<button class="btn-secondary btn-sm" onclick="App.openEditView()">수정</button>` : ''}
+          ${isOwner ? `<button class="btn-danger btn-sm" onclick="App.deletePost()">삭제</button>` : ''}
+          <button class="btn-ghost btn-sm" onclick="App.openBoard(${post.board_id})">목록으로</button>
+        </div>`;
+      html += renderAttachments(data.attachments, isOwner);
       html += await renderCommentsHtml(postId);
       html += renderHistory(data.history);
       html += `</div>`;
@@ -514,8 +514,13 @@ const App = (() => {
     }
 
     document.getElementById('commentForm')?.addEventListener('submit', submitComment);
+    document.getElementById('openCommentComposerBtn')?.addEventListener('click', () => {
+      const composer = document.getElementById('commentForm');
+      if (composer) composer.style.display = '';
+      document.getElementById('commentInput')?.focus();
+    });
     document.getElementById('commentPhotoBtn')?.addEventListener('click', () => {
-    document.getElementById('commentAttachments')?.click();
+      document.getElementById('commentAttachments')?.click();
     });
     document.getElementById('commentInput')?.addEventListener('input', updateCommentCounter);
     updateCommentCounter();
@@ -549,8 +554,8 @@ const App = (() => {
     const isStaff   = ['superadmin','admin','staff'].includes(currentUser.role);
     const canUpload = isStaff || currentUser.role === 'partner';
     return `
-        <div class="attach-section form-group read-group">
-        <label>첨부파일 (${attachments.length})</label>        
+      <div class="attach-section form-group read-group">
+        <label>첨부파일 (${attachments.length})</label>
         <div class="attach-list" id="attachList">
           ${!attachments.length
             ? '<div style="color:var(--muted);font-size:13px">첨부파일 없음</div>'
@@ -605,8 +610,6 @@ const App = (() => {
       const comments = data.comments || [];
       const topLevel = comments.filter(c => !c.parent_id);
       const replies  = comments.filter(c =>  c.parent_id);
-      const isAdmin  = ['superadmin','admin'].includes(currentUser.role);
-
       const attachmentHtml = (attachments) => {
         if (!attachments?.length) return '';
         return `<div class="comment-attachments" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">
@@ -635,28 +638,25 @@ const App = (() => {
             ${!c.is_deleted ? `
               <div class="comment-actions">
                 ${!isReply ? `<button class="comment-btn" onclick="App.replyTo(${c.id},'${esc(c.author_name)}')">답글</button>` : ''}
-                ${isOwner||isAdmin ? `<button class="comment-btn" onclick="App.editComment(${c.id},this)">수정</button>` : ''}
-                ${isOwner||isAdmin ? `<button class="comment-btn danger" onclick="App.deleteComment(${c.id})">삭제</button>` : ''}
+                ${isOwner ? `<button class="comment-btn" onclick="App.editComment(${c.id},this)">수정</button>` : ''}
+                ${isOwner ? `<button class="comment-btn danger" onclick="App.deleteComment(${c.id})">삭제</button>` : ''}
               </div>` : ''}
           </div>
           ${reps.map(r => renderComment(r, true)).join('')}`;
       };
 
       return `
-      
-          <div class="comment-section form-group read-group">
+        <div class="comment-section form-group read-group">
           <label>댓글 (${comments.filter(c => !c.is_deleted).length})</label>
-
           <div class="comment-list" id="commentList">
             ${topLevel.length ? topLevel.map(c => renderComment(c)).join('') : '<div style="color:var(--muted);font-size:13px">댓글이 없습니다.</div>'}
           </div>
-          <form class="comment-composer" id="commentForm">
-          
+          <button type="button" class="btn-secondary btn-sm" id="openCommentComposerBtn">댓글 입력</button>
+          <form class="comment-composer" id="commentForm" style="display:none">
             <div id="replyIndicator" style="display:none;font-size:12px;color:var(--primary);margin-bottom:6px"></div>
             <input type="hidden" id="replyParentId" value="" />
-
-            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="4" maxlength="3000"></textarea>
-            <div class="comment-composer-meta"><span id="commentCount">0</span>/3000</div>
+            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="4" maxlength="2000"></textarea>
+            <div class="comment-composer-meta"><span id="commentCount">0</span>/2000</div>
             <div id="commentAttachmentPreview" class="attachment-preview" style="margin-top:8px"></div>
             <div class="comment-composer-footer">
               <div class="comment-tools">
@@ -667,7 +667,7 @@ const App = (() => {
               <div class="comment-submit-wrap">
                 <button type="button" class="btn-ghost btn-sm" id="cancelReplyBtn" style="display:none;margin-right:8px" onclick="App.cancelReply()">취소</button>
                 <button type="submit" class="btn-primary btn-sm">등록</button>
-              </div>              
+              </div>
             </div>
           </form>
         </div>`;
@@ -675,6 +675,8 @@ const App = (() => {
   }
 
   function replyTo(parentId, authorName) {
+    const composer = document.getElementById('commentForm');
+    if (composer) composer.style.display = '';
     document.getElementById('replyParentId').value = parentId;
     const ind = document.getElementById('replyIndicator');
     ind.textContent   = `↩ ${authorName}님에게 답글 작성 중`;
@@ -1338,7 +1340,7 @@ async function loadBoardManageView() {
     toast('슈퍼관리자만 접근할 수 있습니다.', 'error');
     return;
   }
-
+  
   document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
   document.getElementById('sbBoardManageHome')?.classList.add('active');
   showView('board-manage');

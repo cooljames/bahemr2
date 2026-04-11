@@ -23,7 +23,7 @@
   --section-title:   #58a6ff;
   --section-body:    #3fb950;
   --section-attach:  #d29922;
-  --section-comment: #c678dd;   
+  --section-comment: #c678dd;
 }
 
 /* ── 라이트 테마 ── */
@@ -47,7 +47,6 @@
   --section-body:    #1a7f37;
   --section-attach:  #9a6700;
   --section-comment: #8250df;
-   
 }
 
 :root {
@@ -642,7 +641,6 @@ input, select, textarea { font-family: var(--font); }
   max-width: 100%; 
   width: 100%;
 }
-
 .section-card {
   border: 1px solid var(--border2);
   border-left-width: 4px;
@@ -669,12 +667,14 @@ input, select, textarea { font-family: var(--font); }
   background: var(--primary-bg);
   border: 1px solid var(--border);
 }
+
 .post-header { border-bottom: 1px solid var(--border2); padding-bottom: 20px; margin-bottom: 24px; }
 .post-title  { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.4; margin-bottom: 12px; }
 .post-meta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .post-meta-item { display: flex; align-items: center; gap: 5px; }
 .post-meta-item svg { width: 13px; height: 13px; }
 .post-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.post-actions-bottom { margin-top: 0; margin-bottom: 4px; }
 
 /* 접수 정보 박스 */
 .reception-box {
@@ -788,8 +788,8 @@ input, select, textarea { font-family: var(--font); }
 }
 .comment-input { 
   width: 100%; 
-  background: var(--surface);
-  border: none; 
+  background: var(--surface); 
+  border: none;
   color: var(--text); 
   font-size: 13.5px; 
   padding: 12px 14px; 
@@ -826,6 +826,7 @@ input, select, textarea { font-family: var(--font); }
 .comment-tool-btn:hover{ background: var(--border2); color: var(--text); }
 .comment-tool-btn input{ margin-right: 4px; }
 .comment-submit-wrap{ display:flex; align-items:center; }
+#openCommentComposerBtn { align-self: flex-start; margin-bottom: 8px; }
 
 /* 통합 파일 드롭존 */
 .file-dropzone {
