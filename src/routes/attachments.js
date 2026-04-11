@@ -3,15 +3,6 @@ import { isAdmin } from '../utils/auth.js';
 
 const MAX_FILE_SIZE  = 5 * 1024 * 1024; // 5MB
 const MAX_PROFILE_SIZE = 800 * 1024;    // 프로필 이미지 800KB (D1 row 한계 고려)
-const ALLOWED_TYPES = [
-  'image/jpeg','image/png','image/gif','image/webp',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain','text/csv'
-];
 
 // comment_id 컬럼 존재 여부 캐시 (워커 인스턴스 내)
 let _hasCommentIdCol = null;
@@ -72,9 +63,6 @@ export async function handleAttachments(request, env, user, path) {
     }
 
     const mimeType = file.type || 'application/octet-stream';
-    if (!ALLOWED_TYPES.includes(mimeType)) {
-      return json({ error: `허용되지 않는 파일 형식입니다. (${mimeType})` }, 400);
-    }
 
     // 첨부파일 수 제한 (게시글당 10개)
     if (post_id) {

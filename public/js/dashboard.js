@@ -58,10 +58,16 @@ const App = (() => {
   }
 
   function fileIcon(mime) {
+    if (!mime) return '📎';
     if (mime.startsWith('image/'))                              return '🖼️';
+    if (mime.startsWith('video/'))                              return '🎬';
+    if (mime.startsWith('audio/'))                              return '🎵';
     if (mime === 'application/pdf')                             return '📄';
     if (mime.includes('excel') || mime.includes('spreadsheet')) return '📊';
     if (mime.includes('word'))                                  return '📝';
+    if (mime.includes('zip') || mime.includes('rar') || mime.includes('compressed') || mime.includes('archive')) return '📦';
+    if (mime.includes('text') || mime.includes('json') || mime.includes('xml') || mime.includes('javascript')) return '📃';
+    if (mime.includes('presentation') || mime.includes('powerpoint')) return '📽️';
     return '📎';
   }
 
@@ -499,6 +505,9 @@ const App = (() => {
     }
   }
 
+  // 댓글 첨부파일 누적 목록
+  let commentFiles = [];
+
   function bindPostEvents() {
     const dropZone  = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
@@ -519,35 +528,64 @@ const App = (() => {
       if (composer) composer.style.display = '';
       document.getElementById('commentInput')?.focus();
     });
-    document.getElementById('commentPhotoBtn')?.addEventListener('click', () => {
-      document.getElementById('commentAttachments')?.click();
-    });
     document.getElementById('commentInput')?.addEventListener('input', updateCommentCounter);
     updateCommentCounter();
 
-    const commentFileInput  = document.getElementById('commentAttachments');
-    const commentPreviewDiv = document.getElementById('commentAttachmentPreview');
-    if (commentFileInput && commentPreviewDiv) {
-      commentFileInput.addEventListener('change', () => {
-        commentPreviewDiv.innerHTML = '';
-        Array.from(commentFileInput.files).forEach(file => {
-          if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-              const img = document.createElement('img');
-              img.src = ev.target.result; img.className = 'attachment-thumb';
-              commentPreviewDiv.appendChild(img);
-            };
-            reader.readAsDataURL(file);
-          } else {
-            const div = document.createElement('div');
-            div.className = 'attachment-file';
-            div.innerHTML = `${fileIcon(file.type)} ${file.name}`;
-            commentPreviewDiv.appendChild(div);
-          }
-        });
+    // 댓글 첨부파일 초기화
+    commentFiles = [];
+    const commentFileInput   = document.getElementById('commentAttachments');
+    const commentDropZone    = document.getElementById('commentDropZone');
+    const commentBrowseBtn   = document.getElementById('commentBrowseBtn');
+
+    if (commentBrowseBtn) {
+      commentBrowseBtn.addEventListener('click', (e) => { e.preventDefault(); commentFileInput?.click(); });
+    }
+
+    if (commentDropZone) {
+      commentDropZone.addEventListener('click', (e) => {
+        if (e.target === commentDropZone) commentFileInput?.click();
+      });
+      commentDropZone.addEventListener('dragover', (e) => { e.preventDefault(); commentDropZone.classList.add('dragover'); });
+      commentDropZone.addEventListener('dragleave', () => commentDropZone.classList.remove('dragover'));
+      commentDropZone.addEventListener('drop', (e) => {
+        e.preventDefault(); commentDropZone.classList.remove('dragover');
+        addCommentFiles(Array.from(e.dataTransfer.files));
       });
     }
+
+    if (commentFileInput) {
+      commentFileInput.addEventListener('change', () => {
+        addCommentFiles(Array.from(commentFileInput.files));
+        commentFileInput.value = ''; // 같은 파일 다시 선택 가능
+      });
+    }
+  }
+
+  function addCommentFiles(newFiles) {
+    for (const file of newFiles) {
+      if (commentFiles.length >= 10) { toast('최대 10개까지 첨부할 수 있습니다.', 'error'); break; }
+      if (commentFiles.some(f => f.name === file.name && f.size === file.size)) continue;
+      commentFiles.push(file);
+    }
+    renderCommentFilePreview();
+  }
+
+  function removeCommentFile(index) {
+    commentFiles.splice(index, 1);
+    renderCommentFilePreview();
+  }
+
+  function renderCommentFilePreview() {
+    const previewDiv = document.getElementById('commentAttachmentPreview');
+    if (!previewDiv) return;
+    if (!commentFiles.length) { previewDiv.innerHTML = ''; return; }
+    previewDiv.innerHTML = commentFiles.map((file, i) => `
+      <div class="file-list-item">
+        <span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>
+        <span class="file-list-item-name">${esc(file.name)}</span>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${fileSize(file.size)}</span>
+        <button type="button" class="file-list-item-remove" onclick="App.removeCommentFile(${i})" title="제거">✕</button>
+      </div>`).join('');
   }
 
   function renderAttachments(attachments, canDelete) {
@@ -574,11 +612,14 @@ const App = (() => {
         </div>
         ${canUpload ? `
           <div style="margin-top:10px">
-            <div class="file-drop-zone" id="dropZone">
-              <p>여기에 파일을 끌어다 놓거나 <strong>클릭하여 업로드</strong></p>
-              <p style="font-size:11px;margin-top:4px">PDF, 이미지, Word, Excel · 최대 5MB · 게시글당 10개</p>
+            <div class="file-dropzone" id="dropZone">
+              <div class="file-dropzone-content">
+                <div class="file-dropzone-icon">📎</div>
+                <p>여기에 파일을 끌어다 놓거나 <strong>클릭하여 업로드</strong></p>
+                <p style="font-size:11px;margin-top:2px">모든 파일 형식 · 최대 5MB · 게시글당 10개</p>
+              </div>
             </div>
-            <input type="file" id="fileInput" class="file-input-hidden" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv" />
+            <input type="file" id="fileInput" class="file-input-hidden" multiple />
           </div>` : ''}
       </div>`;
   }
@@ -655,14 +696,17 @@ const App = (() => {
           <form class="comment-composer" id="commentForm" style="display:none">
             <div id="replyIndicator" style="display:none;font-size:12px;color:var(--primary);margin-bottom:6px"></div>
             <input type="hidden" id="replyParentId" value="" />
-            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="4" maxlength="2000"></textarea>
+            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="2" maxlength="2000" style="min-height:auto"></textarea>
             <div class="comment-composer-meta"><span id="commentCount">0</span>/2000</div>
-            <div id="commentAttachmentPreview" class="attachment-preview" style="margin-top:8px"></div>
+            <div class="comment-drop-zone" id="commentDropZone">
+              <span style="font-size:13px;color:var(--muted)">📎 파일을 여기에 끌어다 놓거나</span>
+              <button type="button" class="btn-secondary btn-sm" id="commentBrowseBtn" style="margin-left:8px">파일 첨부</button>
+            </div>
+            <div id="commentAttachmentPreview" class="file-list" style="margin:0 12px 8px"></div>
             <div class="comment-composer-footer">
               <div class="comment-tools">
-                <button type="button" class="comment-tool-btn" id="commentPhotoBtn">📷 사진</button>
                 <label class="comment-tool-btn"><input type="checkbox" id="commentPrivate" /> 비밀댓글</label>
-                <input type="file" id="commentAttachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" style="display:none" />
+                <input type="file" id="commentAttachments" multiple style="display:none" />
               </div>
               <div class="comment-submit-wrap">
                 <button type="button" class="btn-ghost btn-sm" id="cancelReplyBtn" style="display:none;margin-right:8px" onclick="App.cancelReply()">취소</button>
@@ -710,9 +754,8 @@ const App = (() => {
         parent_id: parentId ? parseInt(parentId) : null
       });
 
-      const fileInput = document.getElementById('commentAttachments');
-      if (fileInput?.files.length) {
-        for (const file of fileInput.files) {
+      if (commentFiles.length) {
+        for (const file of commentFiles) {
           const fd = new FormData();
           fd.append('file', file);
           try { await API.upload(`/api/attachments/upload?comment_id=${res.id}`, fd); }
@@ -722,7 +765,7 @@ const App = (() => {
 
       toast('댓글이 등록되었습니다.', 'success');
       document.getElementById('commentInput').value = '';
-      if (fileInput) fileInput.value = '';
+      commentFiles = [];
       document.getElementById('commentAttachmentPreview').innerHTML = '';
       cancelReply();
       await loadPost(currentPostId, currentBoardId);
@@ -846,8 +889,16 @@ const App = (() => {
         </div>
         <div class="form-group">
           <label>첨부파일 <span style="font-size:11px;color:var(--muted);font-weight:normal">(글 저장 후 자동 업로드 · 최대 5MB · 최대 10개)</span></label>
-          <input type="file" id="wAttachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" />
-          <div id="attachmentPreview" class="attachment-preview"></div>
+          <div class="file-dropzone" id="wDropZone">
+            <div class="file-dropzone-content">
+              <div class="file-dropzone-icon">📎</div>
+              <p>여기에 파일을 끌어다 놓거나</p>
+              <button type="button" class="btn-secondary btn-sm" id="wBrowseBtn">파일 선택</button>
+              <p style="font-size:11px;margin-top:2px">모든 파일 형식 · 최대 5MB · 최대 10개</p>
+            </div>
+          </div>
+          <input type="file" id="wAttachments" multiple style="display:none" />
+          <div id="attachmentPreview" class="file-list"></div>
         </div>
         <div class="write-footer">
           <button class="btn-ghost" onclick="App.openBoard(${currentBoardId})">취소</button>
@@ -859,29 +910,62 @@ const App = (() => {
     bindWriteFilePreview();
   }
 
+  // 글쓰기 폼에서 누적된 파일 목록
+  let writeFiles = [];
+
   function bindWriteFilePreview() {
     const fileInput  = document.getElementById('wAttachments');
     const previewDiv = document.getElementById('attachmentPreview');
-    if (!fileInput) return;
-    fileInput.addEventListener('change', () => {
-      previewDiv.innerHTML = '';
-      Array.from(fileInput.files).forEach(file => {
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const img = document.createElement('img');
-            img.src = ev.target.result; img.className = 'attachment-thumb';
-            previewDiv.appendChild(img);
-          };
-          reader.readAsDataURL(file);
-        } else {
-          const div = document.createElement('div');
-          div.className = 'attachment-file';
-          div.innerHTML = `${fileIcon(file.type)} ${file.name}`;
-          previewDiv.appendChild(div);
-        }
-      });
+    const dropZone   = document.getElementById('wDropZone');
+    const browseBtn  = document.getElementById('wBrowseBtn');
+    if (!fileInput || !dropZone) return;
+
+    writeFiles = [];
+
+    // 파일 선택 버튼 클릭
+    browseBtn?.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    // 드래그 앤 드롭
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); dropZone.classList.remove('dragover');
+      addWriteFiles(Array.from(e.dataTransfer.files));
     });
+
+    // 파일 input 변경
+    fileInput.addEventListener('change', () => {
+      addWriteFiles(Array.from(fileInput.files));
+      fileInput.value = ''; // 같은 파일 다시 선택 가능하도록 초기화
+    });
+  }
+
+  function addWriteFiles(newFiles) {
+    for (const file of newFiles) {
+      if (writeFiles.length >= 10) { toast('최대 10개까지 첨부할 수 있습니다.', 'error'); break; }
+      if (writeFiles.some(f => f.name === file.name && f.size === file.size)) continue; // 중복 방지
+      writeFiles.push(file);
+    }
+    renderWriteFilePreview();
+  }
+
+  function removeWriteFile(index) {
+    writeFiles.splice(index, 1);
+    renderWriteFilePreview();
+  }
+
+  function renderWriteFilePreview() {
+    const previewDiv = document.getElementById('attachmentPreview');
+    if (!previewDiv) return;
+    if (!writeFiles.length) { previewDiv.innerHTML = ''; return; }
+    previewDiv.innerHTML = writeFiles.map((file, i) => `
+      <div class="file-list-item">
+        <span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>
+        <span class="file-list-item-name">${esc(file.name)}</span>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${fileSize(file.size)}</span>
+        <button type="button" class="file-list-item-remove" onclick="App.removeWriteFile(${i})" title="제거">✕</button>
+      </div>`).join('');
   }
 
   function renderReceptionForm(rd = {}) {
@@ -960,16 +1044,16 @@ const App = (() => {
         toast('게시글이 등록되었습니다.', 'success');
       }
 
-      const fileInput = document.getElementById('wAttachments');
-      if (fileInput?.files.length) {
+      if (writeFiles.length) {
         let count = 0;
-        for (const file of fileInput.files) {
+        for (const file of writeFiles) {
           const fd = new FormData();
           fd.append('file', file);
           try { await API.upload(`/api/attachments/upload?post_id=${savedId}`, fd); count++; }
           catch (err) { toast(`${file.name} 업로드 실패: ${err.message}`, 'error'); }
         }
         if (count > 0) toast(`첨부파일 ${count}개 업로드 완료`, 'success');
+        writeFiles = [];
       }
 
       await loadPost(savedId, currentBoardId);
@@ -1460,6 +1544,7 @@ async function deleteBoard(boardId, boardName) {
     uploadFiles, downloadFile, deleteFile, viewImage,
     changeStatus, changeAssign,
     replyTo, cancelReply, editComment, deleteComment,
+    removeWriteFile, removeCommentFile,
     exportCSV,
     openCreateBoardModal, closeCreateBoardModal, submitCreateBoard,
     openUserEdit, saveUserEdit,

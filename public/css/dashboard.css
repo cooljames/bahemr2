@@ -826,6 +826,23 @@ input, select, textarea { font-family: var(--font); }
 .comment-tool-btn:hover{ background: var(--border2); color: var(--text); }
 .comment-tool-btn input{ margin-right: 4px; }
 .comment-submit-wrap{ display:flex; align-items:center; }
+
+/* 댓글 첨부파일 드롭 영역 */
+.comment-drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-top: 1px dashed var(--border);
+  transition: all .2s;
+  cursor: pointer;
+}
+.comment-drop-zone:hover,
+.comment-drop-zone.dragover {
+  background: var(--primary-bg);
+  border-color: var(--primary);
+}
+
 #openCommentComposerBtn { align-self: flex-start; margin-bottom: 8px; }
 
 /* 통합 파일 드롭존 */
