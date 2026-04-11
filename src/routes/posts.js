@@ -170,7 +170,7 @@ export async function handlePosts(request, env, user, path) {
     if (!post) return json({ error: '게시글을 찾을 수 없습니다.' }, 404);
 
     const isOwner   = post.author_id === user.sub;
-    const canEdit   = isAdmin(user) || (isOwner && post.status === 'submitted');
+    const canEdit   = isOwner;
     if (!canEdit) return json({ error: '수정 권한이 없습니다.' }, 403);
 
     const body = await request.json();
@@ -249,7 +249,7 @@ export async function handlePosts(request, env, user, path) {
     if (!post) return json({ error: '게시글을 찾을 수 없습니다.' }, 404);
 
     const isOwner = post.author_id === user.sub;
-    if (!isAdmin(user) && !isOwner) return json({ error: '삭제 권한이 없습니다.' }, 403);
+    if (!isOwner) return json({ error: '삭제 권한이 없습니다.' }, 403);
 
     // 첨부파일은 D1에 저장되어 있으므로 posts 삭제 시 CASCADE로 자동 삭제됨
     await env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(postId).run();
