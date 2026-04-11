@@ -18,7 +18,7 @@ export async function handleComments(request, env, user, path) {
        ORDER BY c.created_at ASC`
     ).bind(post_id).all();
 
-    // 삭제된 댓글은 내용 숨김
+    // 삭제된 댓글은 내용 숨김.
     const comments = rows.results.map(c => ({
       ...c,
       content: c.is_deleted ? '(삭제된 댓글입니다.)' : c.content,
