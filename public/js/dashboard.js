@@ -655,8 +655,8 @@ const App = (() => {
           <form class="comment-composer" id="commentForm" style="display:none">
             <div id="replyIndicator" style="display:none;font-size:12px;color:var(--primary);margin-bottom:6px"></div>
             <input type="hidden" id="replyParentId" value="" />
-            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="4" maxlength="3000"></textarea>
-            <div class="comment-composer-meta"><span id="commentCount">0</span>/3000</div>
+            <textarea class="comment-input" id="commentInput" placeholder="댓글을 입력하세요..." rows="4" maxlength="2000"></textarea>
+            <div class="comment-composer-meta"><span id="commentCount">0</span>/2000</div>
             <div id="commentAttachmentPreview" class="attachment-preview" style="margin-top:8px"></div>
             <div class="comment-composer-footer">
               <div class="comment-tools">

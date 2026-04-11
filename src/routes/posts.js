@@ -169,12 +169,19 @@ export async function handlePosts(request, env, user, path) {
     const post   = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(postId).first();
     if (!post) return json({ error: '게시글을 찾을 수 없습니다.' }, 404);
 
-    const isOwner   = post.author_id === user.sub;
-    const canEdit   = isOwner;
-    if (!canEdit) return json({ error: '수정 권한이 없습니다.' }, 403);
-
     const body = await request.json();
     const { title, content, status, assigned_to, is_pinned, reception_data } = body;
+    const isOwner   = post.author_id === user.sub;
+    const hasOwnerOnlyUpdate = title !== undefined || content !== undefined || reception_data !== undefined;
+    const hasWorkflowUpdate  = status !== undefined || assigned_to !== undefined;
+    const hasPinnedUpdate    = is_pinned !== undefined;
+
+    if (!isOwner) {
+      if (hasOwnerOnlyUpdate) return json({ error: '수정 권한이 없습니다.' }, 403);
+      if (hasWorkflowUpdate && !isStaff(user)) return json({ error: '수정 권한이 없습니다.' }, 403);
+      if (hasPinnedUpdate && !isAdmin(user)) return json({ error: '수정 권한이 없습니다.' }, 403);
+      if (!hasWorkflowUpdate && !hasPinnedUpdate) return json({ error: '수정 권한이 없습니다.' }, 403);
+    }
 
     const fields = [];
     const binds  = [];
