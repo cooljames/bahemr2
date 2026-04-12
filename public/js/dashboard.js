@@ -597,17 +597,30 @@ const App = (() => {
   function renderAttachments(attachments, canDelete) {
     const isStaff   = ['superadmin','admin','staff'].includes(currentUser.role);
     const canUpload = isStaff || currentUser.role === 'partner';
+    const images = attachments.filter(a => a.mime_type.startsWith('image/'));
+    const files = attachments.filter(a => !a.mime_type.startsWith('image/'));
+
     return `
       <div class="attach-section form-group read-group">
         <label>첨부파일 (${attachments.length})</label>
+        
+        ${images.length ? `
+          <div class="attach-image-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-bottom: 12px;">
+            ${images.map(a => `
+              <div class="attach-image-item" id="att-${a.id}" style="position:relative;">
+                <img src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius); border:1px solid var(--border); cursor:pointer; transition:transform .15s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" />
+                ${canDelete ? `<button type="button" onclick="App.deleteFile(${a.id})" title="삭제" style="position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
         <div class="attach-list" id="attachList">
           ${!attachments.length
             ? '<div style="color:var(--muted);font-size:13px">첨부파일 없음</div>'
-            : attachments.map(a => `
+            : files.map(a => `
               <div class="attach-item" id="att-${a.id}">
-                ${a.mime_type.startsWith('image/')
-                  ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" />`
-                  : `<span class="attach-icon">${fileIcon(a.mime_type)}</span>`}
+                <span class="attach-icon">${fileIcon(a.mime_type)}</span>
                 <div class="attach-info">
                   <div class="attach-name">${esc(a.filename)}</div>
                   <div class="attach-size">${fileSize(a.file_size)}</div>
@@ -908,6 +921,26 @@ const App = (() => {
           <label>${isRecep ? '추가 내용 / 특이사항' : '내용 *'}</label>
           <textarea id="wContent" placeholder="내용을 입력하세요">${esc(p.content||'')}</textarea>
         </div>
+        ${isEdit && editData?.attachments?.length ? `
+          <div class="form-group read-group" style="margin-bottom: 20px;">
+            <label>기존 첨부파일</label>
+            <div class="attach-list">
+              ${editData.attachments.map(a => `
+                <div class="attach-item" id="att-${a.id}">
+                  ${a.mime_type.startsWith('image/')
+                    ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" />`
+                    : `<span class="attach-icon">${fileIcon(a.mime_type)}</span>`}
+                  <div class="attach-info">
+                    <div class="attach-name">${esc(a.filename)}</div>
+                    <div class="attach-size">${fileSize(a.file_size)}</div>
+                  </div>
+                  <button type="button" class="attach-del" onclick="App.deleteFile(${a.id})" title="삭제">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2"/></svg>
+                  </button>
+                </div>`).join('')}
+            </div>
+          </div>
+        ` : ''}
         <div class="form-group">
           <label>첨부파일 <span style="font-size:11px;color:var(--muted);font-weight:normal">(글 저장 후 자동 업로드 · 최대 5MB · 최대 10개)</span></label>
           <div class="file-dropzone" id="wDropZone">
