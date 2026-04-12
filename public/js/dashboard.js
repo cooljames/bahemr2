@@ -603,7 +603,7 @@ const App = (() => {
           : `<span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>`}
         <span class="file-list-item-name">${esc(file.name)}</span>
         <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${fileSize(file.size)}</span>
-        <button type="button" class="file-list-item-remove" onclick="App.removeCommentFile(${i})" title="제거">✕</button>
+        <button type="button" class="file-list-item-remove" onclick="App.removeCommentFile(${i})" title="제거"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2"/></svg></button>
       </div>`;
     }).join('');
   }
@@ -623,7 +623,7 @@ const App = (() => {
             ${images.map(a => `
               <div class="attach-image-item" id="att-${a.id}" style="position:relative;">
                 <img data-att-img="${a.id}" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius); border:1px solid var(--border); cursor:pointer; transition:transform .15s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" />
-                ${canDelete ? `<button type="button" onclick="App.deleteFile(${a.id})" title="삭제" style="position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>` : ''}
+                ${canDelete ? `<button type="button" onclick="App.deleteFile(${a.id})" title="삭제" style="position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2"/></svg></button>` : ''}
               </div>
             `).join('')}
           </div>
@@ -694,7 +694,7 @@ const App = (() => {
                 ? `<img class="attach-thumb" data-att-img="${a.id}" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
                 : `<div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`}
               <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
-              ${canDeleteAtt ? `<button class="comment-att-del" onclick="App.deleteFile(${a.id})" title="삭제">✕</button>` : ''}
+              ${canDeleteAtt ? `<button class="comment-att-del" onclick="App.deleteFile(${a.id})" title="삭제"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2"/></svg></button>` : ''}
             </div>`).join('')}
         </div>`;
       };
@@ -1051,7 +1051,7 @@ const App = (() => {
           : `<span style="font-size:16px">${fileIcon(file.type || 'application/octet-stream')}</span>`}
         <span class="file-list-item-name">${esc(file.name)}</span>
         <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${fileSize(file.size)}</span>
-        <button type="button" class="file-list-item-remove" onclick="App.removeWriteFile(${i})" title="제거">✕</button>
+        <button type="button" class="file-list-item-remove" onclick="App.removeWriteFile(${i})" title="제거"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2"/></svg></button>
       </div>`;
     }).join('');
   }
