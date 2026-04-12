@@ -500,8 +500,22 @@ const App = (() => {
 
       document.getElementById('postDetail').innerHTML = html;
       bindPostEvents();
+      loadAttachmentImages();
     } catch (err) {
       document.getElementById('postDetail').innerHTML = `<div class="empty-state"><p style="color:var(--error)">${err.message}</p></div>`;
+    }
+  }
+
+  async function loadAttachmentImages() {
+    const imgs = document.querySelectorAll('img[data-att-img]');
+    for (const img of imgs) {
+      if (img.dataset.loaded) continue;
+      const attId = img.getAttribute('data-att-img');
+      try {
+        const url = await API.getAttachmentBlobUrl(attId);
+        img.src = url;
+        img.dataset.loaded = 'true';
+      } catch (err) { console.error('Image load error', err); }
     }
   }
 
@@ -608,7 +622,7 @@ const App = (() => {
           <div class="attach-image-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-bottom: 12px;">
             ${images.map(a => `
               <div class="attach-image-item" id="att-${a.id}" style="position:relative;">
-                <img src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius); border:1px solid var(--border); cursor:pointer; transition:transform .15s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" />
+                <img data-att-img="${a.id}" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius); border:1px solid var(--border); cursor:pointer; transition:transform .15s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" />
                 ${canDelete ? `<button type="button" onclick="App.deleteFile(${a.id})" title="삭제" style="position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>` : ''}
               </div>
             `).join('')}
@@ -677,7 +691,7 @@ const App = (() => {
           ${attachments.map(a => `
             <div style="position:relative" id="att-${a.id}">
               ${a.mime_type.startsWith('image/')
-                ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
+                ? `<img class="attach-thumb" data-att-img="${a.id}" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
                 : `<div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`}
               <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
               ${canDeleteAtt ? `<button class="comment-att-del" onclick="App.deleteFile(${a.id})" title="삭제">✕</button>` : ''}
@@ -837,16 +851,29 @@ const App = (() => {
     catch (err) { toast(err.message, 'error'); }
   }
 
-  function viewImage(attId, filename) {
+  async function viewImage(attId, filename) {
     const modal = document.createElement('div');
     modal.className = 'image-modal';
     modal.innerHTML = `
       <div class="image-modal-overlay" onclick="this.parentElement.remove()"></div>
       <div class="image-modal-content">
-        <img src="/api/attachments/${attId}" alt="${esc(filename)}" />
+        <div style="padding:20px;color:var(--text);font-size:14px">이미지 로드 중...</div>
         <button class="image-modal-close" onclick="this.parentElement.parentElement.remove()">✕</button>
       </div>`;
     document.body.appendChild(modal);
+
+    try {
+      const url = await API.getAttachmentBlobUrl(attId);
+      modal.querySelector('.image-modal-content').innerHTML = `
+        <img src="${url}" alt="${esc(filename)}" />
+        <button class="image-modal-close" onclick="this.parentElement.parentElement.remove()">✕</button>
+      `;
+    } catch (err) {
+      modal.querySelector('.image-modal-content').innerHTML = `
+        <div style="padding:20px;color:var(--error);font-size:14px">이미지를 불러올 수 없습니다.</div>
+        <button class="image-modal-close" onclick="this.parentElement.parentElement.remove()">✕</button>
+      `;
+    }
   }
 
   function viewLocalImage(blobUrl, filename) {
@@ -928,7 +955,7 @@ const App = (() => {
               ${editData.attachments.map(a => `
                 <div class="attach-item" id="att-${a.id}">
                   ${a.mime_type.startsWith('image/')
-                    ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" />`
+                    ? `<img class="attach-thumb" data-att-img="${a.id}" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" />`
                     : `<span class="attach-icon">${fileIcon(a.mime_type)}</span>`}
                   <div class="attach-info">
                     <div class="attach-name">${esc(a.filename)}</div>
@@ -962,6 +989,7 @@ const App = (() => {
 
     showView('write');
     bindWriteFilePreview();
+    loadAttachmentImages();
   }
 
   // 글쓰기 폼에서 누적된 파일 목록

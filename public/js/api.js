@@ -100,6 +100,16 @@ const API = (() => {
       URL.revokeObjectURL(url);
     },
 
+    /** 첨부파일 이미지 Blob URL 가져오기 */
+    async getAttachmentBlobUrl(attId) {
+      const res = await fetch(`/api/attachments/${attId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      if (!res.ok) throw new Error('이미지 로드 실패');
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
+
     /** 첨부파일 다운로드 */
     async downloadAttachment(attId, filename) {
       const res = await fetch(`/api/attachments/${attId}/download`, {
