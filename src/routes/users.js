@@ -40,6 +40,38 @@ export async function handleUsers(request, env, user, path) {
   const method = request.method;
   const url    = new URL(request.url);
 
+  // ── POST /api/users/ping (현재 접속 상태 업데이트) ─────────
+  if (path === '/api/users/ping' && method === 'POST') {
+    try {
+      await env.DB.prepare('UPDATE users SET last_seen_at = datetime("now") WHERE id = ?').bind(user.sub).run();
+    } catch (err) {
+      if (err.message.includes('no such column')) {
+        await env.DB.prepare('ALTER TABLE users ADD COLUMN last_seen_at DATETIME').run();
+        await env.DB.prepare('UPDATE users SET last_seen_at = datetime("now") WHERE id = ?').bind(user.sub).run();
+      }
+    }
+    return json({ ok: true });
+  }
+
+  // ── GET /api/users/active (최근 접속자 목록) ──────────────
+  if (path === '/api/users/active' && method === 'GET') {
+    try {
+      const rows = await env.DB.prepare(
+        `SELECT u.id, u.name, u.role, u.profile_image, c.name as company_name, u.last_seen_at
+         FROM users u
+         LEFT JOIN companies c ON c.id = u.company_id
+         WHERE u.last_seen_at >= datetime('now', '-2 minutes') AND u.is_active = 1
+         ORDER BY u.last_seen_at DESC`
+      ).all();
+      return json({ active_users: rows.results || [] });
+    } catch (err) {
+      if (err.message.includes('no such column')) {
+        return json({ active_users: [] });
+      }
+      return json({ error: err.message }, 500);
+    }
+  }
+
   // ── GET /api/users — 목록 (admin 이상) ─────────────────────────
   if (path === '/api/users' && method === 'GET') {
     if (!isAdmin(user)) return json({ error: '권한이 없습니다.' }, 403);

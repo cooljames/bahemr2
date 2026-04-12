@@ -211,6 +211,7 @@ const App = (() => {
       await loadBoards();
       await loadHome();
       showView('home');
+      startPresencePolling();
     } catch (err) {
       console.error('대시보드 로드 에러:', err);
       alert('로드 실패: ' + (err.message || err));
@@ -221,6 +222,15 @@ const App = (() => {
   function openSidebar()  { document.getElementById('sidebar').classList.add('open');    document.getElementById('sbOverlay').classList.add('show'); }
   function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sbOverlay').classList.remove('show'); }
   function logout()       { API.clearToken(); window.location.href = '/index.html'; }
+
+  function startPresencePolling() {
+    API.post('/api/users/ping').catch(()=>{}); // init
+    setInterval(() => {
+      if (API.getToken()) {
+        API.post('/api/users/ping').catch(()=>{});
+      }
+    }, 60000); // every 60s
+  }
 
   // ── 대시보드 홈 ───────────────────────────────────────────────────
   async function goHome() {
@@ -273,6 +283,29 @@ const App = (() => {
             <span class="recent-row-meta">${fmtDate(p.created_at)}</span>
           </div>`).join('');
       }
+
+      // 게시판 바로가기 렌더링
+      loadBoardShortcuts();
+
+      // 최근 접속자 로드
+      try {
+        const activeData = await API.get('/api/users/active');
+        const activeListEl = document.getElementById('activeUsersList');
+        if (activeListEl) {
+          if (!activeData.active_users || activeData.active_users.length === 0) {
+            activeListEl.innerHTML = '<div style="color:var(--muted); font-size: 13px;">현재 다른 접속자가 없습니다.</div>';
+          } else {
+            activeListEl.innerHTML = activeData.active_users.map(u => `
+              <div style="display:flex; align-items:center; gap:6px; background:var(--surface2); padding:4px 10px; border-radius:20px; border:1px solid var(--border);">
+                <span style="font-size:12px; font-weight:600; color:var(--text);">${esc(u.name)}</span>
+                <span style="font-size:10px; color:var(--muted); font-family:var(--mono)">${u.company_name ? esc(u.company_name) : ROLE_LABEL[u.role]||u.role}</span>
+              </div>
+            `).join('');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load active users', err);
+      }
     } catch (err) {
       console.error('loadHome error:', err);
     }
@@ -300,6 +333,11 @@ const App = (() => {
     }
   }
 
+  // ── 듀얼 뷰 상태 ─────────────────────────────────────────────────
+  let dualBoardId   = null;
+  let dualPage      = 1;
+  let isDualMode    = false;
+
   // ── 게시판 열기 ───────────────────────────────────────────────────
   async function openBoard(boardId) {
     closeSidebar();
@@ -317,6 +355,12 @@ const App = (() => {
     document.getElementById('btnExport').style.display    = (isRecep && isAdmin) ? '' : 'none';
     document.getElementById('btnWrite').style.display     = board.can_write ? '' : 'none';
 
+    // 듀얼 뷰 셀렉트 갱신
+    populateDualViewSelect(boardId);
+
+    // 듀얼 모드 해제
+    toggleDualView('');
+
     setBreadcrumb([{ label: board.name }]);
     showView('board');
 
@@ -325,6 +369,83 @@ const App = (() => {
     });
 
     await loadPosts();
+  }
+
+  function populateDualViewSelect(excludeBoardId) {
+    const sel = document.getElementById('dualViewSelect');
+    sel.innerHTML = '<option value="">듀얼 뷰 모드 끄기</option>' +
+      boards.filter(b => b.id !== excludeBoardId)
+        .map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  }
+
+  async function toggleDualView(val) {
+    const container = document.getElementById('boardListsContainer');
+    const dualWrap  = document.getElementById('dualBoardWrap');
+    if (val) {
+      dualBoardId = parseInt(val);
+      isDualMode  = true;
+      dualPage    = 1;
+      const dualBoard = boards.find(b => b.id === dualBoardId) || {};
+      document.getElementById('dtTitle').textContent = dualBoard.name || '서브 게시판';
+      container.style.gridTemplateColumns = '1fr 1fr';
+      dualWrap.style.display = 'flex';
+      await loadDualPosts();
+    } else {
+      dualBoardId = null;
+      isDualMode  = false;
+      container.style.gridTemplateColumns = '1fr';
+      dualWrap.style.display = 'none';
+    }
+  }
+
+  async function loadDualPosts() {
+    if (!dualBoardId) return;
+    const tbody = document.getElementById('dualPostTableBody');
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-td">불러오는 중...</td></tr>';
+    try {
+      const params = new URLSearchParams({ board_id: dualBoardId, page: dualPage, limit: 20 });
+      const data = await API.get(`/api/posts?${params}`);
+      renderDualPostTable(data);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="4" class="empty-td" style="color:var(--error)">${err.message}</td></tr>`;
+    }
+  }
+
+  function renderDualPostTable(data) {
+    const posts = data.posts || [];
+    const total = data.total || 0;
+    const tbody = document.getElementById('dualPostTableBody');
+    if (!posts.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-td">게시글이 없습니다.</td></tr>';
+    } else {
+      tbody.innerHTML = posts.map((p, i) => {
+        const num = total - ((dualPage - 1) * 20) - i;
+        return `
+          <tr onclick="App.openPostModal(${p.id}, ${p.board_id})">
+            <td class="td-num" data-label="번호">${p.is_pinned ? '📌' : num}</td>
+            <td data-label="제목"><div class="td-title"><span class="td-title-text">${esc(p.title)}</span></div></td>
+            <td data-label="작성자">${esc(p.author_name)}</td>
+            <td class="td-date" data-label="날짜">${fmtDate(p.created_at)}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    const totalPages = Math.ceil(total / 20);
+    const pagEl = document.getElementById('dualPagination');
+    if (totalPages <= 1) { pagEl.innerHTML = ''; return; }
+    const start = Math.max(1, dualPage - 2);
+    const end   = Math.min(totalPages, dualPage + 2);
+    let btns = `<button class="page-btn" onclick="App.goDualPage(${dualPage-1})" ${dualPage===1?'disabled':''}>‹</button>`;
+    for (let p = start; p <= end; p++) {
+      btns += `<button class="page-btn ${p===dualPage?'active':''}" onclick="App.goDualPage(${p})">${p}</button>`;
+    }
+    btns += `<button class="page-btn" onclick="App.goDualPage(${dualPage+1})" ${dualPage===totalPages?'disabled':''}>›</button>`;
+    pagEl.innerHTML = btns;
+  }
+
+  function goDualPage(p) {
+    dualPage = p;
+    loadDualPosts();
   }
 
   // ── 게시글 목록 ───────────────────────────────────────────────────
@@ -364,7 +485,7 @@ const App = (() => {
         const cmt  = p.comment_count    > 0 ? `<span class="td-cmt">💬${p.comment_count}</span>`    : '';
         const att  = p.attachment_count > 0 ? `<span class="td-att">📎${p.attachment_count}</span>` : '';
         return `
-          <tr onclick="App.loadPost(${p.id}, ${p.board_id})">
+          <tr onclick="App.openPostModal(${p.id}, ${p.board_id})">
             <td class="td-num" data-label="번호">${p.is_pinned ? '📌' : num}</td>
             <td data-label="제목">
               <div class="td-title">${p.is_pinned ? '<span class="td-pinned">📌</span>' : ''}<span class="td-title-text">${esc(p.title)}</span></div>
@@ -398,10 +519,93 @@ const App = (() => {
     window.scrollTo(0, 0);
   }
 
+  // ── 게시글 모달 (듀얼 뷰 전용) ─────────────────────────────────────
+  async function openPostModal(postId, boardId) {
+    if (!isDualMode) {
+      // 듀얼 모드가 아니면 기존 상세 뷰로
+      return loadPost(postId, boardId);
+    }
+    const modal = document.getElementById('modalPostView');
+    modal.style.display = 'flex';
+    document.getElementById('modalPostContent').innerHTML = '<div class="loading-row" style="padding:40px">불러오는 중...</div>';
+    try {
+      const data = await API.get(`/api/posts/${postId}`);
+      const post = data.post;
+      const rd   = data.reception_data;
+      document.getElementById('modalPostTitle').textContent = post.title;
+
+      let html = `
+        <div class="post-meta-row" style="margin-bottom:16px">
+          <span class="post-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            ${esc(post.author_name)}
+            ${post.company_name ? `<span style="color:var(--muted)">(${esc(post.company_name)})</span>` : ''}
+          </span>
+          <span class="post-meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            ${fmtDateTime(post.created_at)}
+          </span>
+          <span class="post-meta-item">👁 ${post.view_count}</span>
+          ${post.status ? badgeHtml(post.status) : ''}
+        </div>`;
+
+      if (post.board_type === 'reception' && rd) {
+        html += `
+          <div class="reception-box" style="margin-bottom:16px">
+            <h3>📋 접수 대상자 정보</h3>
+            <div class="reception-grid">
+              <div class="rg-item"><span class="rg-label">환자명</span><span class="rg-value">${esc(rd.patient_name||'')}</span></div>
+              <div class="rg-item"><span class="rg-label">생년월일</span><span class="rg-value">${esc(rd.patient_dob||'')}</span></div>
+              <div class="rg-item"><span class="rg-label">성별</span><span class="rg-value">${rd.patient_gender==='M'?'남성':rd.patient_gender==='F'?'여성':''}</span></div>
+            </div>
+          </div>`;
+      }
+
+      html += `
+        <div class="post-body ql-editor" style="padding:16px;border:1px solid var(--border);border-radius:var(--radius);min-height:120px;margin-bottom:16px">${post.content || ''}</div>`;
+
+      // 첨부파일 요약
+      if (data.attachments?.length) {
+        const images = data.attachments.filter(a => a.mime_type.startsWith('image/'));
+        const files  = data.attachments.filter(a => !a.mime_type.startsWith('image/'));
+        html += `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">첨부파일 ${data.attachments.length}개</div>`;
+        if (images.length) {
+          html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:12px">`;
+          images.forEach(a => {
+            html += `<img data-att-img="${a.id}" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="width:100%;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" />`;
+          });
+          html += `</div>`;
+        }
+        files.forEach(a => {
+          html += `<div class="attach-item" style="margin-bottom:4px">
+            <span class="attach-icon">${fileIcon(a.mime_type)}</span>
+            <div class="attach-info"><div class="attach-name">${esc(a.filename)}</div><div class="attach-size">${fileSize(a.file_size)}</div></div>
+            <button class="attach-dl" onclick="App.downloadFile(${a.id},'${esc(a.filename)}')">다운로드</button>
+          </div>`;
+        });
+      }
+
+      html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border2)">
+        <button class="btn-primary btn-sm" onclick="App.closePostModal(); App.loadPost(${postId}, ${post.board_id});">전체 보기로 열기</button>
+      </div>`;
+
+      document.getElementById('modalPostContent').innerHTML = html;
+      loadAttachmentImages();
+    } catch (err) {
+      document.getElementById('modalPostContent').innerHTML = `<div style="padding:20px;color:var(--error)">${err.message}</div>`;
+    }
+  }
+
+  function closePostModal() {
+    document.getElementById('modalPostView').style.display = 'none';
+  }
+
   // ── 게시글 상세 ───────────────────────────────────────────────────
   async function loadPost(postId, boardId) {
     if (boardId && boardId !== currentBoardId) currentBoardId = boardId;
     currentPostId = postId;
+    // 듀얼 모드 해제
+    isDualMode = false;
     showView('post');
     document.getElementById('postDetail').innerHTML = '<div class="loading-row" style="padding:40px">불러오는 중...</div>';
 
@@ -1422,6 +1626,96 @@ const App = (() => {
     } catch (err) { toast(err.message, 'error'); }
   }
 
+  // ── 게시판 관리 ───────────────────────────────────────────────────
+  async function loadBoardManageView() {
+    showView('board-manage');
+    setBreadcrumb([{ label: '게시판 관리' }]);
+    const el = document.getElementById('boardManageContent');
+    el.innerHTML = '<div class="loading-row">불러오는 중...</div>';
+    
+    try {
+      await loadBoards();
+      const rows = boards.map(b => `
+        <tr data-id="${b.id}" class="board-row" draggable="true" style="cursor:move; background:var(--surface)">
+          <td style="text-align:center;width:40px;color:var(--muted)">☰</td>
+          <td>${b.id}</td>
+          <td><strong>${esc(b.name)}</strong></td>
+          <td>${esc(b.description || '')}</td>
+          <td>${b.post_count || 0}개</td>
+          <td style="font-size:12px;color:var(--muted)">${fmtDate(b.created_at)}</td>
+          <td>
+            <button class="btn-danger btn-sm" onclick="App.deleteBoard(${b.id})">삭제</button>
+          </td>
+        </tr>`).join('');
+
+      el.innerHTML = `
+        <div class="mgmt-table-wrap">
+          <table class="mgmt-table" id="boardManageTable">
+            <thead><tr><th>이동</th><th>ID</th><th>이름</th><th>설명</th><th>게시물수</th><th>생성일</th><th></th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="7" class="empty-td">게시판 없음</td></tr>'}</tbody>
+          </table>
+        </div>`;
+      
+      const tbody = el.querySelector('tbody');
+      let dragSrcEl = null;
+
+      function handleDragStart(e) {
+        dragSrcEl = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+        this.style.opacity = '0.4';
+      }
+
+      function handleDragOver(e) { e.preventDefault(); return false; }
+
+      function handleDrop(e) {
+        e.stopPropagation();
+        if (dragSrcEl !== this) {
+          const allRows = Array.from(tbody.querySelectorAll('.board-row'));
+          const srcIdx = allRows.indexOf(dragSrcEl);
+          const tgtIdx = allRows.indexOf(this);
+          if (srcIdx < tgtIdx) this.parentNode.insertBefore(dragSrcEl, this.nextSibling);
+          else this.parentNode.insertBefore(dragSrcEl, this);
+        }
+        return false;
+      }
+
+      function handleDragEnd(e) { this.style.opacity = '1'; }
+
+      tbody.querySelectorAll('.board-row').forEach(function(row) {
+        row.addEventListener('dragstart', handleDragStart, false);
+        row.addEventListener('dragover', handleDragOver, false);
+        row.addEventListener('drop', handleDrop, false);
+        row.addEventListener('dragend', handleDragEnd, false);
+      });
+    } catch (err) { el.innerHTML = `<div style="color:var(--error);padding:20px">${err.message}</div>`; }
+  }
+
+  async function saveBoardOrder() {
+    const table = document.getElementById('boardManageTable');
+    if (!table) return;
+    const updatePromises = [];
+    table.querySelectorAll('tbody .board-row').forEach((row, index) => {
+      const boardId = row.getAttribute('data-id');
+      updatePromises.push(API.patch(`/api/boards/${boardId}`, { sort_order: index }));
+    });
+    try {
+      await Promise.all(updatePromises);
+      toast('게시판 순서가 저장되었습니다.', 'success');
+      await loadBoards(); // reload sidebar
+    } catch (err) { toast('순서 저장 중 오류가 발생했습니다: ' + err.message, 'error'); }
+  }
+
+  async function deleteBoard(boardId) {
+    if (!confirm('정말 삭제하시겠습니까? (관련된 모든 게시글이 삭제됩니다)')) return;
+    try {
+      await API.delete(`/api/boards/${boardId}`);
+      toast('게시판이 삭제되었습니다.', 'success');
+      await loadBoards();
+      await loadBoardManageView();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
   // ── 프로필 편집 ───────────────────────────────────────────────────
   // Canvas API로 이미지를 maxPx 이내로 리사이즈 후 JPEG 압축
   function resizeImageToDataUri(file, maxPx = 256, quality = 0.82) {
@@ -1527,85 +1821,78 @@ const App = (() => {
     } catch (err) { toast(err.message || '저장 중 오류가 발생했습니다.', 'error'); }
   }
 
-function initBoardShortcuts() {
-  const container = document.getElementById('boardShortcuts');
-  let draggedElement = null;
-  
-  container.addEventListener('dragstart', (e) => {
-    draggedElement = e.target.closest('.board-shortcut');
-    draggedElement.classList.add('dragging');
-  });
-  
-  container.addEventListener('dragend', (e) => {
-    draggedElement.classList.remove('dragging');
-    saveBoardOrder();
-  });
-  
-  container.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    const afterElement = getDragAfterElement(container, e.clientY);
-    if (afterElement == null) {
-      container.appendChild(draggedElement);
-    } else {
-      container.insertBefore(draggedElement, afterElement);
-    }
-  });
-}
-
-function saveBoardOrder() {
-  const shortcuts = document.querySelectorAll('.board-shortcut');
-  const order = Array.from(shortcuts).map(s => s.dataset.boardId);
-  localStorage.setItem('bahemr_board_order', JSON.stringify(order));
-}
-
-function resetBoardOrder() {
-  localStorage.removeItem('bahemr_board_order');
-  loadBoardShortcuts(); // 재로드
-}
-
-async function loadBoardManageView() {
-  if (currentUser.role !== 'superadmin') {
-    toast('슈퍼관리자만 접근할 수 있습니다.', 'error');
-    return;
+  // ── 게시판 바로가기 (홈 화면) ──────────────────────────────────────
+  function loadBoardShortcuts() {
+    const container = document.getElementById('boardShortcuts');
+    if (!container) return;
+    const iconMap = { notice: '📢', reception: '📋' };
+    let ordered = [...boards];
+    try {
+      const saved = JSON.parse(localStorage.getItem('bahemr_board_order'));
+      if (saved && saved.length) {
+        ordered.sort((a, b) => {
+          const ai = saved.indexOf(String(a.id));
+          const bi = saved.indexOf(String(b.id));
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        });
+      }
+    } catch {}
+    container.innerHTML = ordered.map(b => `
+      <div class="board-shortcut" data-board-id="${b.id}" draggable="true" onclick="App.openBoard(${b.id})">
+        <div class="board-shortcut-icon">${iconMap[b.type] || '💬'}</div>
+        <div class="board-shortcut-info">
+          <div class="board-shortcut-name">${esc(b.name)}</div>
+          <div class="board-shortcut-count">${b.post_count || 0}개의 게시글</div>
+        </div>
+      </div>`).join('');
+    initBoardShortcuts();
   }
-  
-  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
-  document.getElementById('sbBoardManageHome')?.classList.add('active');
-  showView('board-manage');
-  setBreadcrumb([{label: '게시판 삭제'}]);
-  
-  const content = document.getElementById('boardManageContent');
-  const boards = await API.get('/api/boards');
-  
-  let html = '<div class="mgmt-table-wrap"><table class="mgmt-table">';
-  html += '<thead><tr><th>ID</th><th>게시판명</th><th>타입</th><th>게시글 수</th><th>작업</th></tr></thead><tbody>';
-  
-  boards.boards.forEach(b => {
-    html += `<tr>
-      <td>${b.id}</td>
-      <td>${esc(b.name)}</td>
-      <td>${esc(b.type)}</td>
-      <td>${b.post_count || 0}</td>
-      <td><button class="btn-danger btn-sm" onclick="App.deleteBoard(${b.id}, '${esc(b.name)}')">삭제</button></td>
-    </tr>`;
-  });
-  
-  html += '</tbody></table></div>';
-  content.innerHTML = html;
-}
 
-async function deleteBoard(boardId, boardName) {
-  if (!confirm(`"${boardName}" 게시판을 삭제하시겠습니까?\n\n⚠️ 모든 게시글과 댓글이 삭제됩니다.`)) return;
-  
-  try {
-    await API.delete(`/api/boards/${boardId}`);
-    toast('게시판이 삭제되었습니다.', 'success');
-    loadBoardManageView();
-    loadBoards(); // 사이드바 새로고침
-  } catch (err) {
-    toast(err.message, 'error');
+  function initBoardShortcuts() {
+    const container = document.getElementById('boardShortcuts');
+    if (!container) return;
+    let draggedElement = null;
+
+    container.addEventListener('dragstart', (e) => {
+      draggedElement = e.target.closest('.board-shortcut');
+      if (draggedElement) draggedElement.classList.add('dragging');
+    });
+
+    container.addEventListener('dragend', () => {
+      if (draggedElement) draggedElement.classList.remove('dragging');
+      saveBoardShortcutOrder();
+    });
+
+    container.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(container, e.clientX);
+      if (draggedElement) {
+        if (afterElement == null) container.appendChild(draggedElement);
+        else container.insertBefore(draggedElement, afterElement);
+      }
+    });
   }
-}
+
+  function getDragAfterElement(container, x) {
+    const elements = [...container.querySelectorAll('.board-shortcut:not(.dragging)')];
+    return elements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = x - box.left - box.width / 2;
+      if (offset < 0 && offset > closest.offset) return { offset, element: child };
+      return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  function saveBoardShortcutOrder() {
+    const shortcuts = document.querySelectorAll('.board-shortcut');
+    const order = Array.from(shortcuts).map(s => s.dataset.boardId);
+    localStorage.setItem('bahemr_board_order', JSON.stringify(order));
+  }
+
+  function resetBoardOrder() {
+    localStorage.removeItem('bahemr_board_order');
+    loadBoardShortcuts();
+  }
 
   function initFileDropzone(dropzoneEl, fileInputEl, fileListEl) {
   const files = [];
@@ -1684,6 +1971,8 @@ async function deleteBoard(boardId, boardName) {
   return {
     init, goHome,
     openBoard, loadPosts, loadPost, goPage,
+    toggleDualView, loadDualPosts, goDualPage,
+    openPostModal, closePostModal,
     openWriteView, openEditView, submitPost, deletePost,
     uploadFiles, downloadFile, deleteFile, viewImage, viewLocalImage,
     changeStatus, changeAssign,
@@ -1693,9 +1982,10 @@ async function deleteBoard(boardId, boardName) {
     openCreateBoardModal, closeCreateBoardModal, submitCreateBoard,
     openUserEdit, saveUserEdit,
     openCompanyModal, closeCompanyModal, submitCompany, deleteCompany,
-    loadCompaniesView, loadUsersView, loadBoardManageView, deleteBoard,
+    loadCompaniesView, loadUsersView, loadBoardManageView, deleteBoard, saveBoardOrder,
     openProfileModal, closeProfileModal,
     handleProfileImageChange, removeProfileImage, submitProfile,
+    resetBoardOrder, loadBoardShortcuts,
     applyTheme,
     toast
   };

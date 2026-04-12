@@ -395,7 +395,7 @@ input, select, textarea { font-family: var(--font); }
   flex: 1; 
   padding: 24px; 
   width: 100%; 
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
   overflow-x: hidden; 
 }
@@ -1191,3 +1191,39 @@ input, select, textarea { font-family: var(--font); }
   .stat-grid { grid-template-columns: 1fr; }
   .top-user-avatar { width: 32px; height: 32px; font-size: 12px; }
 }
+
+/* ════════════════════════════════
+   듀얼 뷰 모드
+════════════════════════════════ */
+@media (max-width: 900px) {
+  #boardListsContainer {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 게시글 상세 모달 (듀얼 뷰용) */
+#modalPostView .modal {
+  width: 800px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+#modalPostView .modal-body {
+  padding: 0;
+}
+
+#modalPostContent {
+  border: none;
+  padding: 20px;
+}
+
+/* 실시간 접속자 패널 */
+.active-users-panel {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+

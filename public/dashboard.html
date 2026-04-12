@@ -32,10 +32,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
         <span>대시보드 홈</span>
       </a>
-      <a href="#" class="sb-item" data-view="board-manage" id="sbBoardManageHome" style="display:none">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
-        <span>게시판 삭제</span>
-      </a>
     </div>
 
     <!-- 게시판 목록 -->
@@ -51,6 +47,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         <span>게시판 생성</span>
       </button>
+      <a href="#" class="sb-item sb-item--add" data-view="board-manage" id="sbBoardManageHome" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+        <span>게시판 관리</span>
+      </a>
     </div>
 
     <!-- 관리 메뉴 (admin 이상) -->
@@ -170,6 +170,17 @@
         <div class="status-bars" id="statusBars"></div>
       </div>
 
+      <!-- 최근 접속자 현황 -->
+      <div class="active-users-panel" id="activeUsersPanel">
+        <h3 style="font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          <span style="display:inline-block; width:8px; height:8px; background:var(--primary); border-radius:50%; box-shadow: 0 0 6px var(--primary)"></span>
+          실시간 접속자 (최근 2분)
+        </h3>
+        <div id="activeUsersList" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+          <div style="color:var(--muted); font-size: 13px;">불러오는 중...</div>
+        </div>
+      </div>
+
       <!-- 게시판 바로가기 (드래그 가능) -->
       <div class="board-shortcuts-panel">
         <div class="panel-header">
@@ -222,29 +233,56 @@
           <option value="rejected">반려</option>
         </select>
         <button class="btn-ghost" onclick="App.loadPosts()">검색</button>
+        <div style="flex:1"></div>
+        <select id="dualViewSelect" class="filter-select" onchange="App.toggleDualView(this.value)">
+          <option value="">듀얼 뷰 모드 끄기</option>
+        </select>
       </div>
 
-      <!-- 게시글 목록 테이블 -->
-      <div class="table-wrap">
-        <table class="post-table">
-          <thead>
-            <tr>
-              <th class="col-num">번호</th>
-              <th class="col-title">제목</th>
-              <th class="col-status" id="thStatus" style="display:none">상태</th>
-              <th class="col-author">작성자</th>
-              <th class="col-company" id="thCompany" style="display:none">관계사</th>
-              <th class="col-date">날짜</th>
-            </tr>
-          </thead>
-          <tbody id="postTableBody">
-            <tr><td colspan="6" class="empty-td">게시글을 불러오는 중...</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <!-- 게시글 목록 래퍼 (듀얼 뷰 지원) -->
+      <div id="boardListsContainer" style="display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start;">
+        
+        <div class="table-wrap" id="mainBoardWrap" style="display:flex; flex-direction:column; min-width:0;">
+          <table class="post-table">
+            <thead>
+              <tr>
+                <th class="col-num">번호</th>
+                <th class="col-title">제목</th>
+                <th class="col-status" id="thStatus" style="display:none">상태</th>
+                <th class="col-author">작성자</th>
+                <th class="col-company" id="thCompany" style="display:none">관계사</th>
+                <th class="col-date">날짜</th>
+              </tr>
+            </thead>
+            <tbody id="postTableBody">
+              <tr><td colspan="6" class="empty-td">게시글을 불러오는 중...</td></tr>
+            </tbody>
+          </table>
+          <!-- 페이지네이션 -->
+          <div class="pagination" id="pagination"></div>
+        </div>
 
-      <!-- 페이지네이션 -->
-      <div class="pagination" id="pagination"></div>
+        <div class="table-wrap" id="dualBoardWrap" style="display:none; flex-direction:column; min-width:0;">
+          <h3 id="dualBoardTitle" style="padding: 12px 16px; border-bottom: 1px solid var(--border); font-size:14px; display:flex; justify-content:space-between;">
+            <span id="dtTitle">서브 게시판</span>
+            <button class="btn-ghost btn-sm" onclick="document.getElementById('dualViewSelect').value=''; App.toggleDualView('');">✕ 닫기</button>
+          </h3>
+          <table class="post-table">
+            <thead>
+              <tr>
+                <th class="col-num">번호</th>
+                <th class="col-title">제목</th>
+                <th class="col-author">작성자</th>
+                <th class="col-date">날짜</th>
+              </tr>
+            </thead>
+            <tbody id="dualPostTableBody">
+              <tr><td colspan="4" class="empty-td">게시글을 불러오는 중...</td></tr>
+            </tbody>
+          </table>
+          <div class="pagination" id="dualPagination"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ── 게시글 상세 뷰 ── -->
@@ -274,11 +312,14 @@
       <div id="companyListContent"></div>
     </div>
 
-    <!-- ── 게시판 삭제 관리 뷰 ── -->
+    <!-- ── 게시판 관리 뷰 ── -->
     <div class="view" id="view-board-manage" style="display:none">
-      <div class="page-header">
-        <h1>게시판 삭제</h1>
-        <p style="color:var(--muted);font-size:13px">게시판을 삭제하면 해당 게시판의 모든 게시글과 댓글도 삭제됩니다.</p>
+      <div class="page-header" style="align-items: center;">
+        <div>
+          <h1>게시판 관리</h1>
+          <p style="color:var(--muted);font-size:13px; margin-top:4px;">목록의 순서를 변경한 후 저장하세요. (삭제 시 복구 불가)</p>
+        </div>
+        <button class="btn-primary" onclick="App.saveBoardOrder()">순서 저장</button>
       </div>
       <div id="boardManageContent"></div>
     </div>
@@ -440,11 +481,24 @@
   </div>
 </div>
 
+<!-- ── 게시글 상세 뷰 (모달팝업) ── -->
+<div class="modal-backdrop" id="modalPostView" style="display:none" onclick="if(event.target===this) App.closePostModal()">
+  <div class="modal" style="width: 800px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-header">
+      <h2 id="modalPostTitle">게시글 상세</h2>
+      <button class="modal-x" onclick="App.closePostModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div id="modalPostContent" class="post-detail" style="border:none; padding:20px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- 토스트 알림 -->
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
-<script src="/js/api.js?v=4"></script>
-<script src="/js/dashboard.js?v=5"></script>
+<script src="/js/api.js?v=5"></script>
+<script src="/js/dashboard.js?v=6"></script>
 </body>
 </html>
