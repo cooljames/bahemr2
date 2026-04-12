@@ -489,11 +489,11 @@ const App = (() => {
         </div>`;
       html += `
         <div class="post-actions post-actions-bottom">
-          ${isOwner ? `<button class="btn-secondary btn-sm" onclick="App.openEditView()">수정</button>` : ''}
-          ${isOwner ? `<button class="btn-danger btn-sm" onclick="App.deletePost()">삭제</button>` : ''}
+          ${(isOwner || isStaff) ? `<button class="btn-secondary btn-sm" onclick="App.openEditView()">수정</button>` : ''}
+          ${(isOwner || isStaff) ? `<button class="btn-danger btn-sm" onclick="App.deletePost()">삭제</button>` : ''}
           <button class="btn-ghost btn-sm" onclick="App.openBoard(${post.board_id})">목록으로</button>
         </div>`;
-      html += renderAttachments(data.attachments, isOwner);
+      html += renderAttachments(data.attachments, isOwner || isStaff);
       html += await renderCommentsHtml(postId);
       html += renderHistory(data.history);
       html += `</div>`;
@@ -657,21 +657,24 @@ const App = (() => {
       const comments = data.comments || [];
       const topLevel = comments.filter(c => !c.parent_id);
       const replies  = comments.filter(c =>  c.parent_id);
-      const attachmentHtml = (attachments) => {
+      const attachmentHtml = (attachments, commentOwnerId) => {
         if (!attachments?.length) return '';
+        const canDeleteAtt = (commentOwnerId === currentUser.sub) || ['superadmin','admin','staff'].includes(currentUser.role);
         return `<div class="comment-attachments" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">
           ${attachments.map(a => `
-            <div>
+            <div style="position:relative" id="att-${a.id}">
               ${a.mime_type.startsWith('image/')
                 ? `<img class="attach-thumb" src="/api/attachments/${a.id}" alt="${esc(a.filename)}" onclick="App.viewImage(${a.id},'${esc(a.filename)}')" style="cursor:pointer;width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />`
                 : `<div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:28px">${fileIcon(a.mime_type)}</div>`}
               <div style="font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
+              ${canDeleteAtt ? `<button class="comment-att-del" onclick="App.deleteFile(${a.id})" title="삭제">✕</button>` : ''}
             </div>`).join('')}
         </div>`;
       };
 
       const renderComment = (c, isReply = false) => {
-        const isOwner = c.author_id === currentUser.sub;
+        const isCommentOwner = c.author_id === currentUser.sub;
+        const isCommentStaff = ['superadmin','admin','staff'].includes(currentUser.role);
         const reps    = isReply ? [] : replies.filter(r => r.parent_id === c.id);
         return `
           <div class="comment-item${isReply?' is-reply':''}${c.is_deleted?' is-deleted':''}" id="cmt-${c.id}">
@@ -681,12 +684,12 @@ const App = (() => {
               <span class="comment-time">${fmtDateTime(c.created_at)}</span>
             </div>
             <div class="comment-body">${esc(c.content)}</div>
-            ${attachmentHtml(c.attachments)}
+            ${attachmentHtml(c.attachments, c.author_id)}
             ${!c.is_deleted ? `
               <div class="comment-actions">
                 ${!isReply ? `<button class="comment-btn" onclick="App.replyTo(${c.id},'${esc(c.author_name)}')">답글</button>` : ''}
-                ${isOwner ? `<button class="comment-btn" onclick="App.editComment(${c.id},this)">수정</button>` : ''}
-                ${isOwner ? `<button class="comment-btn danger" onclick="App.deleteComment(${c.id})">삭제</button>` : ''}
+                ${(isCommentOwner || isCommentStaff) ? `<button class="comment-btn" onclick="App.editComment(${c.id},this)">수정</button>` : ''}
+                ${(isCommentOwner || isCommentStaff) ? `<button class="comment-btn danger" onclick="App.deleteComment(${c.id})">삭제</button>` : ''}
               </div>` : ''}
           </div>
           ${reps.map(r => renderComment(r, true)).join('')}`;

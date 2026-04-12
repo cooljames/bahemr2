@@ -773,6 +773,33 @@ input, select, textarea { font-family: var(--font); }
 .comment-btn:hover { background: var(--border2); color: var(--text); }
 .comment-btn.danger:hover { color: var(--error); }
 
+/* 댓글 첨부파일 삭제 버튼 */
+.comment-att-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.6);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .15s, background .15s;
+  line-height: 1;
+}
+.comment-attachments > div:hover .comment-att-del {
+  opacity: 1;
+}
+.comment-att-del:hover {
+  background: var(--error);
+}
+
 /* 댓글 폼 (통합 드래그앤드롭 + 클릭) */
 .comment-form { 
   display: flex; 
