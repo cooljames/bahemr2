@@ -485,7 +485,7 @@ const App = (() => {
       html += `
         <div class="post-body-section form-group read-group">
           <label>본문</label>
-          <div class="post-body">${esc(post.content)}</div>
+          <div class="post-body ql-editor" style="padding:16px; border:1px solid var(--border); border-radius:var(--radius); min-height:180px;">${post.content || ''}</div>
         </div>`;
       html += `
         <div class="post-actions post-actions-bottom">
@@ -946,7 +946,7 @@ const App = (() => {
         ${isRecep ? renderReceptionForm(rd) : ''}
         <div class="form-group">
           <label>${isRecep ? '추가 내용 / 특이사항' : '내용 *'}</label>
-          <textarea id="wContent" placeholder="내용을 입력하세요">${esc(p.content||'')}</textarea>
+          <div id="wContentEditor">${p.content||''}</div>
         </div>
         ${isEdit && editData?.attachments?.length ? `
           <div class="form-group read-group" style="margin-bottom: 20px;">
@@ -990,6 +990,58 @@ const App = (() => {
     showView('write');
     bindWriteFilePreview();
     loadAttachmentImages();
+    initQuillEditor();
+  }
+
+  let quillEditor = null;
+  function initQuillEditor() {
+    const toolbarOptions = [
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      ['link', 'image'],
+      ['clean']
+    ];
+
+    quillEditor = new Quill('#wContentEditor', {
+      theme: 'snow',
+      placeholder: '내용을 입력하세요...',
+      modules: { toolbar: toolbarOptions }
+    });
+
+    const toolbar = quillEditor.getModule('toolbar');
+    toolbar.addHandler('image', () => {
+      const input = document.createElement('input');
+      input.setAttribute('type', 'file');
+      input.setAttribute('accept', 'image/*');
+      input.click();
+
+      input.onchange = () => {
+        const file = input.files[0];
+        if (!file) return;
+
+        toast('이미지 최적화 및 삽입 중...', 'info');
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+             const canvas = document.createElement('canvas');
+             let w = img.width; let h = img.height;
+             const MAX_WIDTH = 1000;
+             if (w > MAX_WIDTH) { h = Math.round((h * MAX_WIDTH) / w); w = MAX_WIDTH; }
+             canvas.width = w; canvas.height = h;
+             const ctx = canvas.getContext('2d');
+             ctx.drawImage(img, 0, 0, w, h);
+             const base64 = canvas.toDataURL('image/jpeg', 0.8);
+             
+             const range = quillEditor.getSelection(true) || { index: quillEditor.getLength() };
+             quillEditor.insertEmbed(range.index, 'image', base64);
+             quillEditor.setSelection(range.index + 1);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      };
+    });
   }
 
   // 글쓰기 폼에서 누적된 파일 목록
@@ -1091,7 +1143,11 @@ const App = (() => {
 
   async function submitPost(postId) {
     const title   = document.getElementById('wTitle')?.value.trim();
-    const content = document.getElementById('wContent')?.value.trim();
+    let content = '';
+    if (quillEditor) {
+      content = quillEditor.root.innerHTML.trim();
+      if (content === '<p><br></p>') content = ''; // Quill empty content fallback
+    }
     const board   = boards.find(b => b.id === currentBoardId) || {};
     const isRecep = board.type === 'reception';
 

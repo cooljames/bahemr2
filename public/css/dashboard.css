@@ -1116,6 +1116,36 @@ input, select, textarea { font-family: var(--font); }
 .image-modal-close { position: absolute; top: -40px; right: 0; background: rgba(0,0,0,.5); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; }
 
 /* ════════════════════════════════
+   Quill Editor 
+════════════════════════════════ */
+.ql-toolbar.ql-snow {
+  border: 1px solid var(--border) !important;
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+  background: var(--surface2);
+}
+.ql-container.ql-snow {
+  border: 1px solid var(--border) !important;
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  min-height: 250px;
+}
+.ql-editor { min-height: 250px; }
+.ql-editor img { max-width: 100%; height: auto; display: block; margin: 10px 0; border-radius: 4px; }
+.ql-toolbar.ql-snow .ql-stroke { stroke: var(--text); }
+.ql-toolbar.ql-snow .ql-fill { fill: var(--text); }
+.ql-toolbar.ql-snow .ql-picker { color: var(--text); }
+
+/* post-body rendering containing Quill HTML */
+.post-body { white-space: pre-wrap; }
+.post-body img { max-width: 100%; border-radius: 4px; display: block; margin: 16px 0; }
+.post-body p { margin-bottom: 8px; }
+
+/* ════════════════════════════════
    반응형
 ════════════════════════════════ */
 @media (max-width: 1024px) {
